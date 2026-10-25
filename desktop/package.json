@@ -1,7 +1,7 @@
 {
   "name": "manager-futbol-escritorio",
   "productName": "Manager de Futbol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modo local de pruebas del juego mánager de fútbol",
   "author": "Sergio Marín",
   "main": "main.cjs",
