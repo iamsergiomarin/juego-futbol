@@ -61,6 +61,36 @@ jobs:
           }
           Get-ChildItem dist-escritorio -Filter *.exe | ForEach-Object { Write-Host "::notice::Instalador $($_.Name) ($([math]::Round($_.Length / 1MB)) MB)" }
 
+      # Arranca el servidor exactamente como lo hace la aplicación instalada:
+      # el ejecutable de Electron en modo Node, desde resources/servidor.
+      - name: Probar la aplicación empaquetada tal cual
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem dist-escritorio/win-unpacked -Filter *.exe | Select-Object -First 1
+          $servidor = Join-Path $app.DirectoryName "resources\servidor"
+          Write-Host "::notice::Contenido de resources\servidor: $((Get-ChildItem -Force $servidor | ForEach-Object Name) -join ', ')"
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          $env:NODE_ENV = "production"
+          $env:PORT = "3220"
+          $env:HOSTNAME = "127.0.0.1"
+          $env:DATOS_LOCALES = Join-Path $env:RUNNER_TEMP "Manager de Futbol\datos"
+          New-Item -ItemType Directory -Force $env:DATOS_LOCALES | Out-Null
+          $proceso = Start-Process -FilePath $app.FullName -ArgumentList "`"$servidor\server.js`"" -WorkingDirectory $servidor `
+            -PassThru -NoNewWindow -RedirectStandardOutput app.log -RedirectStandardError app-error.log
+          $html = $null
+          for ($i = 0; $i -lt 90; $i++) {
+            if ($proceso.HasExited) { break }
+            try { $html = (Invoke-WebRequest -Uri "http://127.0.0.1:3220/" -UseBasicParsing -TimeoutSec 60).Content; break }
+            catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $proceso.HasExited) { Stop-Process -Id $proceso.Id -Force }
+          if (-not $html -or $html -notmatch "base de datos lista") {
+            Write-Host "::error::La aplicación empaquetada no arrancó (salida: $($proceso.ExitCode))"
+            Get-Content app.log, app-error.log -ErrorAction SilentlyContinue | Select-Object -Last 30 | ForEach-Object { Write-Host "::error::$_" }
+            exit 1
+          }
+          Write-Host "::notice::Aplicación empaquetada OK"
+
       - uses: actions/upload-artifact@v5
         with:
           name: instalador-windows
