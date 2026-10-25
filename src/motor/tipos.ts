@@ -21,6 +21,8 @@ export interface JugadorPartido {
   nombre: string;
   posicion: Posicion;
   atributos: Atributos;
+  /** Cansancio con el que llega al partido (0 = fresco, 1 = agotado). Por defecto, 0. */
+  cansancioInicial?: number;
 }
 
 export type Mentalidad = "defensiva" | "equilibrada" | "ofensiva";
@@ -97,4 +99,8 @@ export interface ResultadoPartido extends Estadisticas {
   /** Marcador al llegar al minuto 60 (útil para medir remontadas). */
   marcador60: [number, number];
   semilla: number;
+  /** Cansancio al final del partido de cada jugador que llegó a jugar. */
+  cansancioFinal: Record<string, number>;
+  /** Jugadores que jugaron algún minuto. */
+  participantes: string[];
 }

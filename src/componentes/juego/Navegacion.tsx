@@ -7,7 +7,7 @@ import { Escudo } from "@/componentes/Escudo";
 const SECCIONES = [
   { href: "/inicio", etiqueta: "Inicio", prefijos: ["/inicio"] },
   { href: "/club", etiqueta: "Club", prefijos: ["/club"] },
-  { href: "/equipo", etiqueta: "Equipo", prefijos: ["/equipo"] },
+  { href: "/equipo", etiqueta: "Equipo", prefijos: ["/equipo", "/jugador"] },
   { href: "/competicion", etiqueta: "Competición", prefijos: ["/competicion", "/partido"] },
 ];
 

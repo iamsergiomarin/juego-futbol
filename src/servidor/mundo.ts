@@ -1,7 +1,8 @@
 import type { Transaction } from "@electric-sql/pglite";
 import { crearRng, gauss, generarJugador, mediaJugador, semillaAleatoria, uniforme, type Posicion, type Rng } from "@/motor";
-import { BOTS, CLUB_NUEVO, LIGA, MERCADO, division, valorOrientativo } from "@/dominio/reglas";
+import { BOTS, CLUB_NUEVO, LIGA, division, type NivelDivision } from "@/dominio/reglas";
 import { coloresBot, elegir, nombreJugador, nombresClubes } from "@/dominio/nombres";
+import { MERCADO_LOCAL, salarioReferencia, valorJugador } from "@/dominio/mercado";
 import { bdLocal } from "./bd";
 import { asegurarCalendario } from "./liga";
 
@@ -32,14 +33,14 @@ export function validarClub(d: DatosClubNuevo): ErroresClub {
 }
 
 /** Lunes siguiente a la fecha dada (la temporada arranca en lunes, día de liga). */
-function proximoLunes(desde: Date): Date {
+export function proximoLunes(desde: Date): Date {
   const d = new Date(Date.UTC(desde.getUTCFullYear(), desde.getUTCMonth(), desde.getUTCDate()));
   const dias = (8 - d.getUTCDay()) % 7 || 7;
   d.setUTCDate(d.getUTCDate() + dias);
   return d;
 }
 
-const isoFecha = (d: Date) => d.toISOString().slice(0, 10);
+export const isoFecha = (d: Date) => d.toISOString().slice(0, 10);
 
 const PERSONALIDADES = [
   ["normal", 40], ["profesional", 20], ["ambicioso", 12], ["lider", 8], ["timido", 12], ["conflictivo", 8],
@@ -54,15 +55,7 @@ function personalidad(rng: Rng): string {
   return "normal";
 }
 
-function factorEdadValor(edad: number): number {
-  if (edad <= 21) return 1.6;
-  if (edad <= 24) return 1.25;
-  if (edad >= 31) return 0.5;
-  if (edad >= 29) return 0.8;
-  return 1;
-}
-
-interface JugadorNuevo {
+export interface JugadorNuevo {
   nombre: string;
   apellido: string;
   nacimiento: string;
@@ -71,15 +64,47 @@ interface JugadorNuevo {
   media: number;
   potencial: number;
   personalidad: string;
-  contratoHasta: number;
+  contratoHasta: number | null;
   salario: number;
   valor: number;
-  dorsal: number;
+  dorsal: number | null;
 }
 
-/** Plantilla de 22 jugadores con la media objetivo de su división. */
-export function generarPlantilla(rng: Rng, nivel: number, inicioTemporada: Date, temporada: number): JugadorNuevo[] {
-  const quinta = division(5);
+/** Un jugador nuevo con la media objetivo, edad realista, potencial, salario y valor. */
+export function crearJugador(
+  rng: Rng,
+  posicion: Posicion,
+  nivel: number,
+  inicioTemporada: Date,
+  temporada: number,
+  divisionNivel: NivelDivision,
+  edadMedia = 25,
+): JugadorNuevo {
+  const edad = Math.round(Math.min(35, Math.max(17, gauss(rng, edadMedia, 4))));
+  const nacimiento = new Date(inicioTemporada);
+  nacimiento.setUTCFullYear(nacimiento.getUTCFullYear() - edad);
+  nacimiento.setUTCDate(nacimiento.getUTCDate() - Math.floor(rng() * 365));
+  const j = generarJugador(rng, "", "", posicion, Math.max(1, nivel));
+  const atributos = j.atributos as Record<string, number>;
+  const media = mediaJugador(atributos);
+  const extra = edad <= 22 ? uniforme(rng, 5, 30) : edad <= 26 ? uniforme(rng, 0, 12) : uniforme(rng, 0, 4);
+  return {
+    ...nombreJugador(rng),
+    nacimiento: isoFecha(nacimiento),
+    posicion,
+    atributos,
+    media,
+    potencial: Math.round(Math.min(100, media * 10 + extra)),
+    personalidad: personalidad(rng),
+    contratoHasta: temporada + 1 + Math.floor(rng() * 3),
+    salario: salarioReferencia(media, divisionNivel),
+    valor: valorJugador(media, edad),
+    dorsal: null,
+  };
+}
+
+/** Plantilla de 22 jugadores con la media objetivo y dorsales del 1 al 22 (porteros 1, 13 y 25). */
+export function generarPlantilla(rng: Rng, nivel: number, inicio: Date, temporada: number, divisionNivel: NivelDivision = 5): JugadorNuevo[] {
   const posiciones: Posicion[] = [];
   for (const [pos, n] of Object.entries(CLUB_NUEVO.plantilla) as [Posicion, number][]) {
     for (let i = 0; i < n; i++) posiciones.push(pos);
@@ -87,44 +112,24 @@ export function generarPlantilla(rng: Rng, nivel: number, inicioTemporada: Date,
   const dorsalesPortero = [1, 13, 25];
   let siguienteDorsal = 2;
   let porteros = 0;
-
+  const usados = new Set<string>();
   return posiciones.map((posicion) => {
-    const edad = Math.round(Math.min(35, Math.max(17, gauss(rng, 25, 4))));
-    const nacimiento = new Date(inicioTemporada);
-    nacimiento.setUTCFullYear(nacimiento.getUTCFullYear() - edad);
-    nacimiento.setUTCDate(nacimiento.getUTCDate() - Math.floor(rng() * 365));
-    const nivelJugador = Math.max(1, gauss(rng, nivel, 0.35));
-    const j = generarJugador(rng, "", "", posicion, nivelJugador);
-    const atributos = j.atributos as Record<string, number>;
-    const media = mediaJugador(atributos);
-    const extra = edad <= 22 ? uniforme(rng, 5, 30) : edad <= 26 ? uniforme(rng, 0, 12) : uniforme(rng, 0, 4);
-    const potencial = Math.round(Math.min(100, media * 10 + extra));
-    const salarioMedio = quinta.presupuesto * MERCADO.salarioMedio;
-    const salario = Math.round((salarioMedio * (media / quinta.mediaTipica) ** 2) / 500) * 500;
-    const valor = Math.round((valorOrientativo(media) * factorEdadValor(edad)) / 1000) * 1000;
-    let dorsal: number;
-    if (posicion === "POR") dorsal = dorsalesPortero[porteros++];
+    const j = crearJugador(rng, posicion, gauss(rng, nivel, 0.35), inicio, temporada, divisionNivel);
+    // Sin homónimos en el mismo vestuario: confunden en la alineación.
+    for (let intento = 0; usados.has(`${j.nombre} ${j.apellido}`) && intento < 20; intento++) Object.assign(j, nombreJugador(rng));
+    usados.add(`${j.nombre} ${j.apellido}`);
+    if (posicion === "POR") j.dorsal = dorsalesPortero[porteros++];
     else {
       if (siguienteDorsal === 13) siguienteDorsal++;
-      dorsal = siguienteDorsal++;
+      j.dorsal = siguienteDorsal++;
     }
-    return {
-      ...nombreJugador(rng),
-      nacimiento: isoFecha(nacimiento),
-      posicion,
-      atributos,
-      media,
-      potencial,
-      personalidad: personalidad(rng),
-      contratoHasta: temporada + 1 + Math.floor(rng() * 3),
-      salario,
-      valor,
-      dorsal,
-    };
+    return j;
   });
 }
 
-async function insertarPlantilla(tx: Transaction, clubId: string, jugadores: JugadorNuevo[]) {
+/** Inserta jugadores en un club (o como agentes libres si `clubId` es null). */
+export async function insertarJugadores(tx: Transaction, clubId: string | null, jugadores: JugadorNuevo[]) {
+  if (jugadores.length === 0) return;
   const columnas = 13;
   const valores: unknown[] = [];
   const filas = jugadores.map((j, i) => {
@@ -141,6 +146,29 @@ async function insertarPlantilla(tx: Transaction, clubId: string, jugadores: Jug
     valores,
   );
 }
+
+/** Agentes libres: jugadores sin club que se pueden fichar sin pagar traspaso. */
+export async function generarAgentesLibres(
+  tx: Transaction,
+  rng: Rng,
+  nivel: number,
+  cantidad: number,
+  inicio: Date,
+  temporada: number,
+  divisionNivel: NivelDivision,
+) {
+  const posiciones: Posicion[] = ["POR", "DEF", "DEF", "DEF", "MED", "MED", "MED", "DEL", "DEL"];
+  const jugadores = Array.from({ length: cantidad }, () => {
+    // Variedad: veteranos baratos, jóvenes con proyección y algún jugador hecho.
+    const perfil = rng();
+    const edadMedia = perfil < 0.3 ? 20 : perfil < 0.75 ? 26 : 31;
+    const j = crearJugador(rng, elegir(rng, posiciones), nivel * uniform(rng, 0.8, 1.15), inicio, temporada, divisionNivel, edadMedia);
+    return { ...j, contratoHasta: null };
+  });
+  await insertarJugadores(tx, null, jugadores);
+}
+
+const uniform = uniforme;
 
 /** Estadio, edificios e instalaciones con los que arranca todo club. */
 async function insertarInstalaciones(tx: Transaction, clubId: string) {
@@ -190,11 +218,64 @@ async function insertarPersonalBasico(tx: Transaction, rng: Rng, clubId: string,
   }
 }
 
+export interface DatosClub {
+  nombre: string;
+  corto: string;
+  ciudad: string;
+  colores: [string, string];
+  manager: string | null;
+  nivel: number;
+  grupo: number | null;
+  temporadaId: number;
+  temporadaNumero: number;
+  inicio: Date;
+  divisionNivel: NivelDivision;
+}
+
+/** Inserta un club completo: plantilla, instalaciones y fila de clasificación (si tiene grupo). */
+export async function insertarClub(tx: Transaction, rng: Rng, c: DatosClub): Promise<string> {
+  const presupuesto = division(c.divisionNivel).presupuesto;
+  const id = (
+    await tx.query<{ id: string }>(
+      `insert into clubes (nombre, nombre_corto, ciudad, manager_id, perfil_bot, orden_en_grupo_empresarial, grupo_id,
+         dinero, masa_social, popularidad, color_principal, color_secundario)
+       values ($1, $2, $3, $4, $5::perfil_bot, $6, $7, $8, $9, $10, $11, $12) returning id`,
+      [
+        c.nombre, c.corto, c.ciudad, c.manager, c.manager ? null : elegir(rng, ["equilibrado", "defensivo", "cantera", "gastador"]),
+        c.manager ? 1 : null, c.grupo, Math.round(presupuesto * CLUB_NUEVO.dineroInicial),
+        Math.round(CLUB_NUEVO.masaSocial * (1 + (5 - c.divisionNivel) * 0.8)), CLUB_NUEVO.popularidad, c.colores[0], c.colores[1],
+      ],
+    )
+  ).rows[0].id;
+  await insertarJugadores(tx, id, generarPlantilla(rng, c.nivel, c.inicio, c.temporadaNumero, c.divisionNivel));
+  await insertarInstalaciones(tx, id);
+  if (c.grupo != null) {
+    await tx.query("insert into clasificacion (temporada_id, grupo_id, club_id) values ($1, $2, $3)", [c.temporadaId, c.grupo, id]);
+  }
+  return id;
+}
+
+/** Club bot con nombre y colores al azar (sin repetir nombres ya usados). */
+export async function insertarClubBot(
+  tx: Transaction,
+  rng: Rng,
+  c: Omit<DatosClub, "nombre" | "corto" | "ciudad" | "colores" | "manager">,
+  usados: Set<string>,
+): Promise<string> {
+  const [b] = nombresClubes(rng, 1, usados);
+  const corto = b.ciudad.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "").slice(0, 3).toUpperCase();
+  return insertarClub(tx, rng, { ...c, nombre: b.nombre, corto, ciudad: b.ciudad, colores: coloresBot(rng), manager: null });
+}
+
+export async function nombresUsados(tx: Transaction): Promise<Set<string>> {
+  return new Set((await tx.query<{ n: string }>("select lower(nombre) as n from clubes")).rows.map((r) => r.n));
+}
+
 export class ErrorCreacion extends Error {}
 
 /**
- * Crea la partida local: mánager, temporada, grupo de Quinta con 19 bots y el club del jugador.
- * El club del jugador releva a un bot del grupo (al inicio de temporada todos tienen 0 puntos).
+ * Crea la partida local: mánager, temporada, grupo de Quinta con 19 bots, el club del jugador
+ * y los agentes libres del mercado.
  */
 export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semillaAleatoria()): Promise<string> {
   const errores = validarClub(datos);
@@ -208,7 +289,6 @@ export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semilla
     const existentes = await tx.query<{ n: number }>("select count(*)::int as n from managers");
     if (existentes.rows[0].n > 0) throw new ErrorCreacion("Ya existe una partida en este ordenador.");
 
-    // Temporada 1
     const inicio = proximoLunes(new Date());
     const fin = new Date(inicio);
     fin.setUTCDate(fin.getUTCDate() + LIGA.semanasTemporada * 7 - 1);
@@ -218,45 +298,17 @@ export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semilla
         [isoFecha(inicio), isoFecha(fin)],
       )
     ).rows[0].id;
+    const grupo = (await tx.query<{ id: number }>("insert into grupos (division, numero, abierto) values (5, 1, true) returning id")).rows[0].id;
 
-    // Grupo 1 de Quinta
-    const grupo = (
-      await tx.query<{ id: number }>("insert into grupos (division, numero, abierto) values (5, 1, true) returning id")
-    ).rows[0].id;
-
-    // Mánager local
     const usuario = (await tx.query<{ id: string }>("insert into auth.users default values returning id")).rows[0].id;
     await tx.query(
       "insert into managers (id, nombre, socio_fundador, tutorial_completado) values ($1, $2, true, false)",
       [usuario, datos.nombreManager.trim()],
     );
 
-    const dineroInicial = Math.round(quinta.presupuesto * CLUB_NUEVO.dineroInicial);
-    const crearClub = async (c: {
-      nombre: string; corto: string; ciudad: string; colores: [string, string]; manager: string | null; nivel: number;
-    }) => {
-      const id = (
-        await tx.query<{ id: string }>(
-          `insert into clubes (nombre, nombre_corto, ciudad, manager_id, perfil_bot, orden_en_grupo_empresarial, grupo_id,
-             dinero, masa_social, popularidad, color_principal, color_secundario)
-           values ($1, $2, $3, $4, $5::perfil_bot, $6, $7, $8, $9, $10, $11, $12) returning id`,
-          [
-            c.nombre, c.corto, c.ciudad, c.manager, c.manager ? null : elegir(rng, ["equilibrado", "defensivo", "cantera", "gastador"]),
-            c.manager ? 1 : null, grupo, dineroInicial, CLUB_NUEVO.masaSocial, CLUB_NUEVO.popularidad, c.colores[0], c.colores[1],
-          ],
-        )
-      ).rows[0].id;
-      await insertarPlantilla(tx, id, generarPlantilla(rng, c.nivel, inicio, 1));
-      await insertarInstalaciones(tx, id);
-      await tx.query(
-        "insert into clasificacion (temporada_id, grupo_id, club_id) values ($1, $2, $3)",
-        [temporada, grupo, id],
-      );
-      return id;
-    };
-
-    // Club del jugador, con la media típica de Quinta
-    const clubId = await crearClub({
+    const comun = { grupo, temporadaId: temporada, temporadaNumero: 1, inicio, divisionNivel: 5 as NivelDivision };
+    const clubId = await insertarClub(tx, rng, {
+      ...comun,
       nombre: datos.nombreClub.trim(),
       corto: datos.abreviatura.trim().toUpperCase(),
       ciudad: datos.ciudad.trim(),
@@ -269,17 +321,10 @@ export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semilla
     // 19 bots, algo por debajo en Quinta para que el recién llegado no se hunda
     const nivelBot = quinta.mediaTipica * BOTS.nivelEnQuinta;
     const usados = new Set([datos.nombreClub.trim().toLowerCase()]);
-    for (const b of nombresClubes(rng, LIGA.equiposPorGrupo - 1, usados)) {
-      const corto = b.ciudad.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "").slice(0, 3).toUpperCase();
-      await crearClub({
-        nombre: b.nombre,
-        corto,
-        ciudad: b.ciudad,
-        colores: coloresBot(rng),
-        manager: null,
-        nivel: nivelBot * uniforme(rng, 1 - BOTS.variacionNivel, 1 + BOTS.variacionNivel),
-      });
+    for (let i = 0; i < LIGA.equiposPorGrupo - 1; i++) {
+      await insertarClubBot(tx, rng, { ...comun, nivel: nivelBot * uniforme(rng, 1 - BOTS.variacionNivel, 1 + BOTS.variacionNivel) }, usados);
     }
+    await generarAgentesLibres(tx, rng, quinta.mediaTipica, MERCADO_LOCAL.agentesLibres, inicio, 1, 5);
     return clubId;
   });
   await asegurarCalendario();

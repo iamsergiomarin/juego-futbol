@@ -17,7 +17,7 @@ export function Caja({
   sinRelleno?: boolean;
 }) {
   return (
-    <section className={`flex flex-col rounded-2xl border border-borde bg-superficie ${className}`}>
+    <section className={`flex min-w-0 flex-col rounded-2xl border border-borde bg-superficie ${className}`}>
       <div className="flex items-baseline justify-between gap-3 px-5 pt-4 pb-3">
         <h2 className="font-semibold">{titulo}</h2>
         {enlace ? (

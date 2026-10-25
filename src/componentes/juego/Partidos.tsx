@@ -24,11 +24,14 @@ export function PartidosDelClub({ partidos, clubId, vacio }: { partidos: Partido
         return (
           <li key={p.id}>
             <Link href={`/partido/${p.id}`} className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-fondo">
-              <span className="w-8 shrink-0 text-xs text-suave tabular-nums">J{p.jornada}</span>
+              <span className="w-8 shrink-0 text-xs text-suave tabular-nums" title={p.ronda ?? undefined}>
+                {p.competicion === "playoff" ? "PO" : `J${p.jornada}`}
+              </span>
               <Escudo principal={rival.colorPrincipal} secundario={rival.colorSecundario} texto={rival.corto} tamano={22} titulo={rival.nombre} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{rival.nombre}</span>
                 <span className="block text-xs text-suave">
+                  {p.ronda ? `${p.ronda} · ` : ""}
                   {enCasa ? "En casa" : "Fuera"} · {formatoFechaHora(p.inicio)}
                 </span>
               </span>

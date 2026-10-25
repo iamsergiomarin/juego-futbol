@@ -25,6 +25,7 @@ class EstadoEquipo {
   readonly condicionales: Condicional[];
   readonly condicionalesUsadas = new Set<string>();
   readonly cansancio = new Map<string, number>();
+  readonly participantes = new Set<string>();
   cambios = 0;
   ventanasUsadas = 0;
   adaptacionHasta = -1;
@@ -39,7 +40,8 @@ class EstadoEquipo {
     this.familiaridad = e.familiaridad;
     this.segundoEntrenador = e.segundoEntrenador;
     this.condicionales = e.condicionales;
-    for (const j of [...e.titulares, ...e.banquillo]) this.cansancio.set(j.id, 0);
+    for (const j of [...e.titulares, ...e.banquillo]) this.cansancio.set(j.id, Math.min(1, Math.max(0, j.cansancioInicial ?? 0)));
+    for (const j of e.titulares) this.participantes.add(j.id);
   }
 
   de(pos: Posicion): JugadorPartido[] {
@@ -61,6 +63,15 @@ class EstadoEquipo {
     return total / jugadores.length;
   }
 
+  /**
+   * Peso de una línea según cuántos jugadores tiene respecto al 4-4-2 de referencia:
+   * reforzar una zona debilita otra, y así cada sistema tiene su precio.
+   */
+  presencia(pos: Posicion): number {
+    const referencia: Record<Posicion, number> = { POR: 1, DEF: 4, MED: 4, DEL: 2 };
+    return 1 + C.pesoPorJugadorDeLinea * (this.de(pos).length - referencia[pos]);
+  }
+
   factorAdaptacion(minuto: number): number {
     return minuto <= this.adaptacionHasta ? C.rendimientoAdaptacion : 1;
   }
@@ -70,12 +81,12 @@ class EstadoEquipo {
       0.7 * this.mediaAtributos(this.de("MED"), ["pase", "control", "vision", "decision"]) +
       0.15 * this.mediaAtributos(this.de("DEF"), ["pase", "colocacion"]) +
       0.15 * this.mediaAtributos(this.de("DEL"), ["control", "pase"]);
-    return v * this.factorAdaptacion(minuto);
+    return v * this.presencia("MED") * this.factorAdaptacion(minuto);
   }
 
   ataque(minuto: number): number {
     const v =
-      0.6 * this.mediaAtributos(this.de("DEL"), ["regate", "velocidad", "decision", "control"]) +
+      0.6 * this.mediaAtributos(this.de("DEL"), ["regate", "velocidad", "decision", "control"]) * this.presencia("DEL") +
       0.4 * this.mediaAtributos(this.de("MED"), ["vision", "pase", "centros"]);
     return v * this.factorAdaptacion(minuto);
   }
@@ -84,7 +95,7 @@ class EstadoEquipo {
     const v =
       0.75 * this.mediaAtributos(this.de("DEF"), ["entrada", "colocacion", "fuerza", "velocidad", "aereo"]) +
       0.25 * this.mediaAtributos(this.de("MED"), ["entrada", "colocacion"]);
-    return v * this.factorAdaptacion(minuto);
+    return v * this.presencia("DEF") * this.factorAdaptacion(minuto);
   }
 
   definicion(): number {
@@ -249,6 +260,10 @@ export class SimuladorPartido {
       eventos: [...this.eventos],
       marcador60: [...this.marcador60],
       semilla: this.semilla,
+      cansancioFinal: Object.fromEntries(
+        LADOS.flatMap((l) => [...this.equipos[l].participantes].map((id) => [id, Math.round((this.equipos[l].cansancio.get(id) ?? 0) * 100) / 100])),
+      ),
+      participantes: LADOS.flatMap((l) => [...this.equipos[l].participantes]),
     };
   }
 
@@ -320,6 +335,7 @@ export class SimuladorPartido {
       const entra = eq.banquillo.find((j) => j.id === o.entraId);
       if (!sale || !entra) continue;
       eq.titulares = eq.titulares.map((j) => (j.id === sale.id ? entra : j));
+      eq.participantes.add(entra.id);
       eq.banquillo = eq.banquillo.filter((j) => j.id !== entra.id);
       eq.cambios += 1;
       if (!huboCambio && !descanso) eq.ventanasUsadas += 1;

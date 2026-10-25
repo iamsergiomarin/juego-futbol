@@ -82,3 +82,10 @@ export const NOMBRE_PERSONALIDAD: Record<string, string> = {
   timido: "Tímido",
   conflictivo: "Conflictivo",
 };
+
+export const COLOR_POSICION: Record<"POR" | "DEF" | "MED" | "DEL", string> = {
+  POR: "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
+  DEF: "bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-200",
+  MED: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200",
+  DEL: "bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-200",
+};

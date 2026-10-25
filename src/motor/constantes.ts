@@ -29,6 +29,8 @@ export const CALIBRACION = {
   perdidaPorCansancio: 0.28,
   /** Rendimiento durante el tiempo de adaptación tras un cambio táctico. */
   rendimientoAdaptacion: 0.92,
+  /** Peso de cada jugador de más (o de menos) en una línea respecto al 4-4-2. */
+  pesoPorJugadorDeLinea: 0.07,
   /** Probabilidad de que el juego se interrumpa en un minuto sin tiro. */
   probabilidadInterrupcion: 0.55,
 } as const;

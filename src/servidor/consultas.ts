@@ -234,6 +234,8 @@ export async function clasificacion(grupoId: number): Promise<FilaClasificacion[
 export interface PartidoBreve {
   id: string;
   jornada: number;
+  competicion: "liga" | "playoff" | "copa" | "amistoso" | "filial" | "continental";
+  ronda: string | null;
   inicio: string;
   estado: "programado" | "en_juego" | "finalizado";
   local: ClubBreve;
@@ -243,7 +245,7 @@ export interface PartidoBreve {
 }
 
 const SELECT_PARTIDO = `
-  select p.id, p.jornada, to_json(p.inicio)#>>'{}' as inicio, p.estado, p.goles_local as "golesLocal", p.goles_visitante as "golesVisitante",
+  select p.id, p.jornada, p.competicion, p.ronda, to_json(p.inicio)#>>'{}' as inicio, p.estado, p.goles_local as "golesLocal", p.goles_visitante as "golesVisitante",
          json_build_object('id', l.id, 'nombre', l.nombre, 'corto', l.nombre_corto, 'colorPrincipal', l.color_principal, 'colorSecundario', l.color_secundario) as local,
          json_build_object('id', v.id, 'nombre', v.nombre, 'corto', v.nombre_corto, 'colorPrincipal', v.color_principal, 'colorSecundario', v.color_secundario) as visitante
     from partidos p join clubes l on l.id = p.local_id join clubes v on v.id = p.visitante_id`;
@@ -361,10 +363,10 @@ export async function estadisticasPlantilla(clubId: string): Promise<Map<string,
   const { rows } = await bd.query<EstadisticasJugador>(
     `with t as (select id from temporadas where actual),
           pj as (select unnest(pl.titulares) as jugador from planteamientos pl join partidos p on p.id = pl.partido_id
-                  where pl.club_id = $1 and p.temporada_id = (select id from t) and p.estado = 'finalizado'),
+                  where pl.club_id = $1 and p.temporada_id = (select id from t) and p.estado = 'finalizado' and p.competicion = 'liga'),
           gl as (select e->>'jugadorId' as jugador from partidos p, jsonb_array_elements(p.eventos) e
                   where (p.local_id = $1 or p.visitante_id = $1) and p.temporada_id = (select id from t)
-                    and e->>'tipo' = 'gol')
+                    and p.competicion = 'liga' and e->>'tipo' = 'gol')
      select j.id as "jugadorId",
             (select count(*) from pj where pj.jugador = j.id)::int as partidos,
             (select count(*) from gl where gl.jugador = j.id::text)::int as goles
@@ -389,4 +391,56 @@ export async function sectoresEstadio(clubId: string): Promise<SectorEstadio[]> 
     [clubId],
   );
   return rows;
+}
+
+export interface MovimientoJornada {
+  jornada: number | null;
+  ingresos: number;
+  gastos: number;
+  detalle: { concepto: string; importe: number }[];
+}
+
+/** Movimientos de la temporada agrupados por jornada (los de fuera de jornada, aparte). */
+export async function movimientosPorJornada(clubId: string): Promise<MovimientoJornada[]> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<MovimientoJornada>(
+    `select jornada,
+            coalesce(sum(importe) filter (where importe > 0), 0)::float8 as ingresos,
+            coalesce(sum(importe) filter (where importe < 0), 0)::float8 as gastos,
+            json_agg(json_build_object('concepto', concepto, 'importe', importe) order by importe desc) as detalle
+       from movimientos where club_id = $1 and temporada_id = (select id from temporadas where actual)
+      group by jornada order by jornada desc nulls first`,
+    [clubId],
+  );
+  return rows;
+}
+
+export interface FilaHistorial {
+  temporada: number;
+  division: string;
+  grupo: number;
+  posicion: number;
+  puntos: number;
+  desenlace: string;
+}
+
+export async function historialClub(clubId: string): Promise<FilaHistorial[]> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<FilaHistorial>(
+    `select t.numero as temporada, d.nombre as division, h.grupo, h.posicion, h.puntos, h.desenlace
+       from historial h join temporadas t on t.id = h.temporada_id join divisiones d on d.nivel = h.division
+      where h.club_id = $1 order by t.numero desc`,
+    [clubId],
+  );
+  return rows;
+}
+
+/** Jornadas (de liga o playoff) que quedan por jugar en la temporada. */
+export async function jornadasPendientes(): Promise<number> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<{ n: number }>(
+    `select count(distinct jornada)::int as n from partidos
+      where temporada_id = (select id from temporadas where actual) and competicion in ('liga', 'playoff') and estado <> 'finalizado'`,
+  );
+  return rows[0].n;
 }

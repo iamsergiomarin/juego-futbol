@@ -38,13 +38,16 @@ export default async function Partido({ params }: { params: Promise<{ id: string
   return (
     <div className="grid gap-5 lg:grid-cols-12">
       <div className="lg:col-span-12">
-        <Link href={`/competicion/calendario?jornada=${p.jornada}`} className="text-sm font-semibold text-cesped hover:underline">
-          ← Jornada {p.jornada}
+        <Link
+          href={p.competicion === "playoff" ? "/competicion" : `/competicion/calendario?jornada=${p.jornada}`}
+          className="text-sm font-semibold text-cesped hover:underline"
+        >
+          ← {p.competicion === "playoff" ? "Competición" : `Jornada ${p.jornada}`}
         </Link>
       </div>
       <section className="rounded-2xl border border-borde bg-superficie p-5 sm:p-8 lg:col-span-12">
         <p className="text-center text-xs font-semibold tracking-widest text-suave uppercase">
-          Liga · Jornada {p.jornada} · {formatoFechaHora(p.inicio)}
+          {p.competicion === "playoff" ? `Playoff de ascenso · ${p.ronda}` : `Liga · Jornada ${p.jornada}`} · {formatoFechaHora(p.inicio)}
           {p.asistencia ? ` · ${formatoEntero(p.asistencia)} espectadores` : ""}
         </p>
         <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center">
@@ -116,7 +119,7 @@ export default async function Partido({ params }: { params: Promise<{ id: string
                 </div>
               ))}
             </div>
-            <p className="mt-4 border-t border-borde pt-3 text-xs text-suave">4-4-2 elegido por el segundo entrenador.</p>
+            <p className="mt-4 border-t border-borde pt-3 text-xs text-suave">Titulares en orden: portero, defensas, medios y delanteros.</p>
           </Caja>
         </>
       ) : null}

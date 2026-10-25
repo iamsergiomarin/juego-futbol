@@ -30,7 +30,7 @@ export function BotonesJornada({ restantes }: { restantes: number }) {
         Jugar la jornada
       </Boton>
       {restantes > 1 ? <Boton cantidad={Math.min(5, restantes)}>Simular {Math.min(5, restantes)} jornadas</Boton> : null}
-      {restantes > 5 ? <Boton cantidad={restantes}>Hasta el final</Boton> : null}
+      {restantes > 1 ? <Boton cantidad={99}>Hasta el final</Boton> : null}
     </form>
   );
 }

@@ -26,6 +26,22 @@ Otras reglas: 5 cambios en 3 ventanas más el descanso; tras un cambio táctico,
 
 Se reproduce con `npm run calibrar`.
 
+## Sistemas de juego (desde la 0.4.0)
+
+Cada línea pesa según cuántos jugadores tiene respecto al 4-4-2 de referencia (1 portero, 4 defensas, 4 medios, 2 delanteros): un 7 % más o menos por jugador de diferencia (`pesoPorJugadorDeLinea`). Los medios cuentan para la posesión, los delanteros para el ataque y los defensas para la defensa. El 4-4-2 sigue siendo la referencia, así que la calibración de arriba no cambia.
+
+Con plantillas iguales, promediando local y visitante (un 4-4-2 contra otro gana el 37,5 %):
+
+| Sistema contra un 4-4-2 | Victorias |
+| --- | --- |
+| 4-5-1 | 38,9 % |
+| 3-5-2 | 38,9 % |
+| 3-4-3 | 37,6 % |
+| 5-3-2 | 36,6 % |
+| 4-3-3 | 36,5 % |
+
+Ningún sistema es mejor por sí solo; la diferencia la marcan los jugadores que encajan en cada puesto (un jugador fuera de su posición rinde menos) y la energía con la que llegan.
+
 ## Pendiente
 
 - Dar más peso a tácticas y condicionales según el rival (ahora mueven 2-4 puntos).

@@ -3,6 +3,7 @@ import { Navegacion } from "@/componentes/juego/Navegacion";
 import { modoLocal } from "@/servidor/bd";
 import { cabeceraClub, estadoTemporada, managerLocal } from "@/servidor/consultas";
 import { asegurarCalendario } from "@/servidor/liga";
+import { asegurarMercado } from "@/servidor/mercado";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function LayoutJuego({ children }: { children: React.ReactN
   if (!manager) redirect("/nuevo");
   // Partidas creadas antes de que existiera la liga reciben aquí su calendario.
   await asegurarCalendario();
+  await asegurarMercado();
   const [club, temporada] = await Promise.all([cabeceraClub(manager.clubId), estadoTemporada()]);
   if (!club) redirect("/nuevo");
 
