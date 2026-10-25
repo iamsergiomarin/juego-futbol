@@ -10,9 +10,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -50,9 +50,18 @@ jobs:
           Write-Host "Servidor empaquetado OK"
 
       - name: Crear el instalador
-        run: npx electron-builder --win nsis --x64 --publish never
+        shell: pwsh
+        run: |
+          npx electron-builder --win nsis --x64 --publish never 2>&1 | Tee-Object -FilePath builder.log
+          $codigo = $LASTEXITCODE
+          if ($codigo -ne 0) {
+            # Las últimas líneas como anotaciones, legibles desde la API sin descargar registros.
+            Get-Content builder.log -Tail 25 | ForEach-Object { Write-Host "::error::$_" }
+            exit $codigo
+          }
+          Get-ChildItem dist-escritorio -Filter *.exe | ForEach-Object { Write-Host "::notice::Instalador $($_.Name) ($([math]::Round($_.Length / 1MB)) MB)" }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: instalador-windows
           path: dist-escritorio/*.exe
