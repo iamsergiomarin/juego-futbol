@@ -109,6 +109,20 @@ export const PLANTILLA = {
   minimoDisponibles: 16,
 } as const;
 
+/** Punto de partida de un club recién creado en Quinta. */
+export const CLUB_NUEVO = {
+  /** Dinero en caja al empezar, como fracción del presupuesto de Quinta. */
+  dineroInicial: 0.25,
+  masaSocial: 500,
+  popularidad: 50,
+  /** Plantilla inicial por posición (22 jugadores). */
+  plantilla: { POR: 3, DEF: 7, MED: 7, DEL: 5 },
+  /** Grada principal del campo modesto con el que arranca todo club. */
+  aforoInicial: 2000,
+  /** Calidad (1-100) del personal básico con el que se empieza. */
+  calidadPersonalBasico: [22, 35],
+} as const;
+
 export function division(nivel: NivelDivision): Division {
   return DIVISIONES[nivel];
 }
