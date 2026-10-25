@@ -143,3 +143,250 @@ export async function fichaClub(clubId: string): Promise<FichaClub | null> {
     rivales,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Liga
+// ---------------------------------------------------------------------------
+
+export interface ClubBreve {
+  id: string;
+  nombre: string;
+  corto: string;
+  colorPrincipal: string;
+  colorSecundario: string;
+}
+
+export interface CabeceraClub extends ClubBreve {
+  division: string;
+  grupo: number;
+  grupoId: number;
+  manager: string;
+}
+
+export async function cabeceraClub(clubId: string): Promise<CabeceraClub | null> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<CabeceraClub>(
+    `select c.id, c.nombre, c.nombre_corto as corto, c.color_principal as "colorPrincipal", c.color_secundario as "colorSecundario",
+            d.nombre as division, g.numero as grupo, g.id as "grupoId", coalesce(m.nombre, '') as manager
+       from clubes c join grupos g on g.id = c.grupo_id join divisiones d on d.nivel = g.division
+       left join managers m on m.id = c.manager_id where c.id = $1`,
+    [clubId],
+  );
+  return rows[0] ?? null;
+}
+
+export interface EstadoTemporada {
+  id: number;
+  numero: number;
+  jugadas: number;
+  total: number;
+  proximaFecha: string | null;
+}
+
+export async function estadoTemporada(): Promise<EstadoTemporada | null> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<EstadoTemporada>(
+    `select t.id, t.numero,
+            coalesce((select max(jornada) from partidos p where p.temporada_id = t.id and p.competicion = 'liga'
+                        and not exists (select 1 from partidos q where q.temporada_id = t.id and q.competicion = 'liga'
+                                          and q.jornada = p.jornada and q.estado <> 'finalizado')), 0)::int as jugadas,
+            coalesce((select max(jornada) from partidos p where p.temporada_id = t.id and p.competicion = 'liga'), 0)::int as total,
+            (select to_json(min(inicio))#>>'{}' from partidos p where p.temporada_id = t.id and p.estado <> 'finalizado') as "proximaFecha"
+       from temporadas t where t.actual`,
+  );
+  return rows[0] ?? null;
+}
+
+export interface FilaClasificacion extends ClubBreve {
+  posicion: number;
+  jugados: number;
+  ganados: number;
+  empatados: number;
+  perdidos: number;
+  golesFavor: number;
+  golesContra: number;
+  puntos: number;
+  bot: boolean;
+  racha: ("G" | "E" | "P")[];
+}
+
+export async function clasificacion(grupoId: number): Promise<FilaClasificacion[]> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<Omit<FilaClasificacion, "posicion">>(
+    `select c.id, c.nombre, c.nombre_corto as corto, c.color_principal as "colorPrincipal", c.color_secundario as "colorSecundario",
+            k.jugados, k.ganados, k.empatados, k.perdidos, k.goles_favor as "golesFavor", k.goles_contra as "golesContra",
+            k.puntos, c.manager_id is null as bot,
+            coalesce((select array_agg(r order by inicio desc) from (
+               select p.inicio, case when (case when p.local_id = c.id then p.goles_local - p.goles_visitante
+                                                else p.goles_visitante - p.goles_local end) > 0 then 'G'
+                                     when p.goles_local = p.goles_visitante then 'E' else 'P' end as r
+                 from partidos p where p.estado = 'finalizado' and p.competicion = 'liga' and p.temporada_id = k.temporada_id
+                  and (p.local_id = c.id or p.visitante_id = c.id)
+                order by p.inicio desc limit 5) u), '{}') as racha
+       from clasificacion k join clubes c on c.id = k.club_id
+      where k.grupo_id = $1 and k.temporada_id = (select id from temporadas where actual)
+      order by k.puntos desc, (k.goles_favor - k.goles_contra) desc, k.goles_favor desc, c.nombre`,
+    [grupoId],
+  );
+  return rows.map((r, i) => ({ ...r, posicion: i + 1 }));
+}
+
+export interface PartidoBreve {
+  id: string;
+  jornada: number;
+  inicio: string;
+  estado: "programado" | "en_juego" | "finalizado";
+  local: ClubBreve;
+  visitante: ClubBreve;
+  golesLocal: number | null;
+  golesVisitante: number | null;
+}
+
+const SELECT_PARTIDO = `
+  select p.id, p.jornada, to_json(p.inicio)#>>'{}' as inicio, p.estado, p.goles_local as "golesLocal", p.goles_visitante as "golesVisitante",
+         json_build_object('id', l.id, 'nombre', l.nombre, 'corto', l.nombre_corto, 'colorPrincipal', l.color_principal, 'colorSecundario', l.color_secundario) as local,
+         json_build_object('id', v.id, 'nombre', v.nombre, 'corto', v.nombre_corto, 'colorPrincipal', v.color_principal, 'colorSecundario', v.color_secundario) as visitante
+    from partidos p join clubes l on l.id = p.local_id join clubes v on v.id = p.visitante_id`;
+
+export async function partidosClub(clubId: string, cuales: "jugados" | "pendientes", limite: number): Promise<PartidoBreve[]> {
+  const bd = await bdLocal();
+  const jugados = cuales === "jugados";
+  const { rows } = await bd.query<PartidoBreve>(
+    `${SELECT_PARTIDO}
+      where (p.local_id = $1 or p.visitante_id = $1) and p.temporada_id = (select id from temporadas where actual)
+        and ${jugados ? "p.estado = 'finalizado'" : "p.estado <> 'finalizado'"}
+      order by p.inicio ${jugados ? "desc" : "asc"} limit $2`,
+    [clubId, limite],
+  );
+  return rows;
+}
+
+export async function partidosJornada(grupoId: number, jornada: number): Promise<PartidoBreve[]> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<PartidoBreve>(
+    `${SELECT_PARTIDO}
+      where p.grupo_id = $1 and p.jornada = $2 and p.competicion = 'liga' and p.temporada_id = (select id from temporadas where actual)
+      order by l.nombre`,
+    [grupoId, jornada],
+  );
+  return rows;
+}
+
+export interface DetallePartido extends PartidoBreve {
+  asistencia: number | null;
+  estadisticas: { tiros: [number, number]; posesion: [number, number]; xg: [number, number] } | null;
+  eventos: { minuto: number; tipo: string; lado?: "local" | "visitante"; texto: string; jugadorId?: string }[];
+  alineaciones: { local: { titulares: string[]; banquillo: string[] }; visitante: { titulares: string[]; banquillo: string[] } };
+}
+
+export async function detallePartido(id: string): Promise<DetallePartido | null> {
+  const bd = await bdLocal();
+  const p = (
+    await bd.query<Omit<DetallePartido, "alineaciones">>(
+      `${SELECT_PARTIDO.replace("select p.id,", "select p.asistencia, p.estadisticas, p.eventos, p.id,")} where p.id = $1`,
+      [id],
+    )
+  ).rows[0];
+  if (!p) return null;
+  const nombres = async (clubId: string) => {
+    const r = (
+      await bd.query<{ titulares: string[]; banquillo: string[] }>(
+        `select coalesce((select array_agg(j.nombre || ' ' || j.apellido order by array_position(pl.titulares, j.id))
+                            from jugadores j where j.id = any(pl.titulares)), '{}') as titulares,
+                coalesce((select array_agg(j.nombre || ' ' || j.apellido order by array_position(pl.banquillo, j.id))
+                            from jugadores j where j.id = any(pl.banquillo)), '{}') as banquillo
+           from planteamientos pl where pl.partido_id = $1 and pl.club_id = $2`,
+        [id, clubId],
+      )
+    ).rows[0];
+    return r ?? { titulares: [], banquillo: [] };
+  };
+  return { ...p, alineaciones: { local: await nombres(p.local.id), visitante: await nombres(p.visitante.id) } };
+}
+
+export interface ResumenEconomia {
+  caja: number;
+  ingresos: number;
+  gastos: number;
+  porConcepto: { concepto: string; importe: number }[];
+  ultimaJornada: { jornada: number; neto: number } | null;
+  masaSalarial: number;
+}
+
+export async function resumenEconomia(clubId: string): Promise<ResumenEconomia> {
+  const bd = await bdLocal();
+  const caja = (await bd.query<{ dinero: number }>("select dinero::float8 as dinero from clubes where id = $1", [clubId])).rows[0].dinero;
+  const conceptos = (
+    await bd.query<{ concepto: string; importe: number }>(
+      `select concepto, sum(importe)::float8 as importe from movimientos
+        where club_id = $1 and temporada_id = (select id from temporadas where actual)
+        group by concepto order by abs(sum(importe)) desc`,
+      [clubId],
+    )
+  ).rows;
+  const ultima = (
+    await bd.query<{ jornada: number; neto: number }>(
+      `select jornada, sum(importe)::float8 as neto from movimientos
+        where club_id = $1 and temporada_id = (select id from temporadas where actual) and jornada is not null
+        group by jornada order by jornada desc limit 1`,
+      [clubId],
+    )
+  ).rows[0];
+  const masa = (
+    await bd.query<{ masa: number }>(
+      `select (coalesce((select sum(salario) from jugadores where club_id = $1), 0)
+             + coalesce((select sum(salario) from personal where club_id = $1), 0))::float8 as masa`,
+      [clubId],
+    )
+  ).rows[0].masa;
+  return {
+    caja,
+    ingresos: conceptos.filter((c) => c.importe > 0).reduce((a, c) => a + c.importe, 0),
+    gastos: conceptos.filter((c) => c.importe < 0).reduce((a, c) => a + c.importe, 0),
+    porConcepto: conceptos,
+    ultimaJornada: ultima ?? null,
+    masaSalarial: masa,
+  };
+}
+
+export interface EstadisticasJugador {
+  jugadorId: string;
+  partidos: number;
+  goles: number;
+}
+
+/** Partidos como titular y goles en liga de los jugadores de un club, en la temporada actual. */
+export async function estadisticasPlantilla(clubId: string): Promise<Map<string, EstadisticasJugador>> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<EstadisticasJugador>(
+    `with t as (select id from temporadas where actual),
+          pj as (select unnest(pl.titulares) as jugador from planteamientos pl join partidos p on p.id = pl.partido_id
+                  where pl.club_id = $1 and p.temporada_id = (select id from t) and p.estado = 'finalizado'),
+          gl as (select e->>'jugadorId' as jugador from partidos p, jsonb_array_elements(p.eventos) e
+                  where (p.local_id = $1 or p.visitante_id = $1) and p.temporada_id = (select id from t)
+                    and e->>'tipo' = 'gol')
+     select j.id as "jugadorId",
+            (select count(*) from pj where pj.jugador = j.id)::int as partidos,
+            (select count(*) from gl where gl.jugador = j.id::text)::int as goles
+       from jugadores j where j.club_id = $1`,
+    [clubId],
+  );
+  return new Map(rows.map((r) => [r.jugadorId, r]));
+}
+
+export interface SectorEstadio {
+  sector: string;
+  nivel: number;
+  aforo: number;
+  puntosVenta: number;
+}
+
+export async function sectoresEstadio(clubId: string): Promise<SectorEstadio[]> {
+  const bd = await bdLocal();
+  const { rows } = await bd.query<SectorEstadio>(
+    `select sector, nivel, aforo, puntos_venta as "puntosVenta" from sectores_estadio where club_id = $1
+      order by array_position(array['tribuna','lateral','fondo_norte','fondo_sur','esquinas','cesped'], sector)`,
+    [clubId],
+  );
+  return rows;
+}

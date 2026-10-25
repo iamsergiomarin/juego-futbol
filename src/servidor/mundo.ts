@@ -3,6 +3,7 @@ import { crearRng, gauss, generarJugador, mediaJugador, semillaAleatoria, unifor
 import { BOTS, CLUB_NUEVO, LIGA, MERCADO, division, valorOrientativo } from "@/dominio/reglas";
 import { coloresBot, elegir, nombreJugador, nombresClubes } from "@/dominio/nombres";
 import { bdLocal } from "./bd";
+import { asegurarCalendario } from "./liga";
 
 /** Datos que el jugador elige al crear su club. */
 export interface DatosClubNuevo {
@@ -203,7 +204,7 @@ export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semilla
   const rng = crearRng(semilla);
   const quinta = division(5);
 
-  return bd.transaction(async (tx) => {
+  const clubId = await bd.transaction(async (tx) => {
     const existentes = await tx.query<{ n: number }>("select count(*)::int as n from managers");
     if (existentes.rows[0].n > 0) throw new ErrorCreacion("Ya existe una partida en este ordenador.");
 
@@ -281,4 +282,6 @@ export async function crearPartidaLocal(datos: DatosClubNuevo, semilla = semilla
     }
     return clubId;
   });
+  await asegurarCalendario();
+  return clubId;
 }

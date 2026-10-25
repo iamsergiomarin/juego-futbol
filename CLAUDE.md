@@ -18,6 +18,8 @@ Juego online de mánager de fútbol (proyecto personal de Sergio). El diseño se
 - `supabase/migrations/`: esquema SQL. Nunca editar una migración ya aplicada; crear una nueva.
 - `scripts/calibrar.ts`: batería de calibración del motor.
 - `src/servidor/bd.ts`: acceso a datos. Modo local (PGlite, si existe `DATOS_LOCALES`) y, más adelante, Supabase. Las migraciones se empaquetan en `src/servidor/migraciones.generadas.ts` (`npm run migraciones`); no editarlo a mano.
+- `src/servidor/liga.ts`: calendario (doble vuelta, lunes y sábado a las 21:00), simulación de jornadas con las plantillas reales, clasificación y economía de jornada (provisional, en `ECONOMIA_JORNADA`).
+- `src/app/(juego)/`: pantallas del juego con la barra de navegación común (Inicio, Club, Equipo, Competición) y pestañas por sección.
 - `src/servidor/mundo.ts`: creación de la partida (club del jugador, grupo de Quinta con bots, plantillas, instalaciones). `src/servidor/consultas.ts`: lecturas para las pantallas.
 - `src/dominio/nombres.ts`: nombres ficticios. Las localidades son inventadas para no coincidir con clubes reales.
 - `desktop/`: aplicación de escritorio (Electron) que arranca el servidor autónomo de Next en local. Instalador de Windows en `.github/workflows/escritorio-windows.yml`.

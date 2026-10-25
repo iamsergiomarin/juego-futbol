@@ -86,6 +86,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+      {modoLocal() ? (
+        <Link href="/inicio" className="mb-4 inline-block text-sm font-semibold text-cesped hover:underline">
+          ← Volver al juego
+        </Link>
+      ) : null}
       <p className="text-xs font-semibold tracking-widest text-suave uppercase">Prototipo del motor · Quinta división</p>
       <EstadoLocal />
 

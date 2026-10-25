@@ -27,5 +27,5 @@ export async function crearClub(_previo: EstadoFormulario, formulario: FormData)
     if (e instanceof ErrorCreacion) return { datos, errores: {}, error: e.message };
     throw e;
   }
-  redirect("/club");
+  redirect("/inicio");
 }

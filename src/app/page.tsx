@@ -4,9 +4,9 @@ import { managerLocal } from "@/servidor/consultas";
 
 export const dynamic = "force-dynamic";
 
-/** Puerta de entrada: crear el club la primera vez; después, directo al club. */
+/** Puerta de entrada: crear el club la primera vez; después, al inicio. */
 export default async function Inicio() {
   if (!modoLocal()) redirect("/prototipo");
   const manager = await managerLocal();
-  redirect(manager ? "/club" : "/nuevo");
+  redirect(manager ? "/inicio" : "/nuevo");
 }

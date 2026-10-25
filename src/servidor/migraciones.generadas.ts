@@ -7,5 +7,9 @@ export const MIGRACIONES: { nombre: string; sql: string }[] = [
   {
     "nombre": "0002_identidad_club.sql",
     "sql": "-- Identidad del club (colores del escudo y ciudad) y dorsales.\n\nalter table clubes\n  add column color_principal text not null default '#1f6b3a' check (color_principal ~ '^#[0-9a-fA-F]{6}$'),\n  add column color_secundario text not null default '#ffffff' check (color_secundario ~ '^#[0-9a-fA-F]{6}$'),\n  add column ciudad text;\n\nalter table jugadores\n  add column dorsal smallint check (dorsal between 1 and 99);\n\n-- Un mánager solo puede tener un club por orden dentro de su grupo empresarial.\ncreate unique index un_club_por_orden on clubes (manager_id, orden_en_grupo_empresarial)\n  where manager_id is not null;\n"
+  },
+  {
+    "nombre": "0003_liga.sql",
+    "sql": "-- Liga: jornada en los movimientos económicos e índices para el calendario.\n\nalter table movimientos add column jornada smallint;\n\ncreate index partidos_por_jornada on partidos (temporada_id, grupo_id, competicion, jornada);\ncreate index planteamientos_por_club on planteamientos (club_id);\n"
   }
 ];

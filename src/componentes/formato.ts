@@ -23,6 +23,25 @@ export function formatoFecha(iso: string): string {
   return new Date(`${iso}T12:00:00Z`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
 }
 
+const ZONA = "Europe/Madrid";
+
+/** "sáb. 31 oct · 21:00" a partir de una marca de tiempo ISO. */
+export function formatoFechaHora(iso: string): string {
+  const d = new Date(iso);
+  const dia = d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: ZONA });
+  const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: ZONA });
+  return `${dia} · ${hora}`;
+}
+
+/** "sábado, 31 de octubre" a partir de una marca de tiempo ISO. */
+export function formatoDiaLargo(iso: string): string {
+  return new Date(iso).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: ZONA });
+}
+
+export function formatoSigno(valor: number): string {
+  return `${valor > 0 ? "+" : ""}${formatoEuros(valor)}`;
+}
+
 export const NOMBRE_POSICION: Record<string, string> = {
   POR: "Portero",
   DEF: "Defensa",

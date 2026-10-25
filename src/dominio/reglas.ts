@@ -109,6 +109,28 @@ export const PLANTILLA = {
   minimoDisponibles: 16,
 } as const;
 
+/**
+ * Economía de jornada. PROVISIONAL hasta diseñar en detalle taquilla, televisión y patrocinio:
+ * calibrada para que un club de Quinta con la plantilla inicial cierre la temporada con algo de margen.
+ */
+export const ECONOMIA_JORNADA = {
+  /** Hora de los partidos de liga (hora peninsular). */
+  horaPartido: "21:00",
+  /** Precio medio de la entrada por división (0 = Élite … 5 = Quinta). */
+  precioEntrada: [55, 40, 30, 22, 16, 12],
+  /** Gasto medio por espectador atendido en quioscos y bares. */
+  gastoRestauracion: 4,
+  /** Espectadores que puede atender cada punto de venta por partido. */
+  aforoPorPuntoVenta: 600,
+  /** Demanda de entradas: socios × factor + público ocasional. */
+  demandaPorSocio: 1.5,
+  publicoOcasional: 800,
+  /** Fracción del presupuesto de la división que llega cada temporada por televisión (parte fija). */
+  televisionFija: 0.3,
+  /** Patrocinio base (frontal + marca deportiva) mientras no existan contratos. */
+  patrocinioBase: 0.25,
+} as const;
+
 /** Punto de partida de un club recién creado en Quinta. */
 export const CLUB_NUEVO = {
   /** Dinero en caja al empezar, como fracción del presupuesto de Quinta. */
