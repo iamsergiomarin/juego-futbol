@@ -8,8 +8,30 @@ import {
   type EquipoPartido,
   type EventoPartido,
 } from "@/motor";
+import { estadoBdLocal, modoLocal } from "@/servidor/bd";
 
 export const dynamic = "force-dynamic";
+
+async function EstadoLocal() {
+  if (!modoLocal()) return null;
+  const estado = await estadoBdLocal().then(
+    (e) => ({ ok: true as const, tablas: e.tablas }),
+    (e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }),
+  );
+  if (!estado.ok) {
+    return (
+      <p className="mt-2 rounded-xl bg-rival-suave px-3 py-2 text-xs text-rival">
+        No se pudo abrir la base de datos local: {estado.error}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-cesped-suave px-3 py-1 text-xs text-cesped">
+      <span className="h-2 w-2 rounded-full bg-cesped" aria-hidden />
+      Modo local · base de datos lista ({estado.tablas} tablas)
+    </p>
+  );
+}
 
 function media(e: EquipoPartido): string {
   const m = e.titulares.reduce((a, j) => a + mediaJugador(j.atributos), 0) / e.titulares.length;
@@ -65,6 +87,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
       <p className="text-xs font-semibold tracking-widest text-suave uppercase">Prototipo del motor · Quinta división</p>
+      <EstadoLocal />
 
       <section className="mt-4 rounded-2xl border border-borde bg-superficie p-5 sm:p-8">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">

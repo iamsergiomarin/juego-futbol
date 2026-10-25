@@ -1,0 +1,59 @@
+name: Instalador de Windows (modo local)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar tipos y pruebas
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Construir el servidor del juego
+        run: npm run build:servidor
+
+      - name: Probar el servidor empaquetado con una base de datos nueva
+        shell: pwsh
+        run: |
+          $env:PORT = "3210"
+          $env:HOSTNAME = "127.0.0.1"
+          $env:NODE_ENV = "production"
+          $env:DATOS_LOCALES = Join-Path $env:RUNNER_TEMP "datos de prueba"
+          $servidor = Start-Process node -ArgumentList ".next/standalone/server.js" -PassThru -NoNewWindow `
+            -RedirectStandardOutput servidor.log -RedirectStandardError servidor-error.log
+          $html = $null
+          for ($i = 0; $i -lt 90; $i++) {
+            try { $html = (Invoke-WebRequest -Uri "http://127.0.0.1:3210/?semilla=7" -UseBasicParsing -TimeoutSec 60).Content; break }
+            catch { Start-Sleep -Seconds 1 }
+          }
+          Stop-Process -Id $servidor.Id -Force
+          Get-Content servidor.log, servidor-error.log -ErrorAction SilentlyContinue
+          if (-not $html) { throw "El servidor no respondió" }
+          if ($html -notmatch "base de datos lista") { throw "La base de datos local no se abrió" }
+          if ($html -notmatch "Minuto a minuto") { throw "No se simuló el partido" }
+          Write-Host "Servidor empaquetado OK"
+
+      - name: Crear el instalador
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador-windows
+          path: dist-escritorio/*.exe
+          retention-days: 30

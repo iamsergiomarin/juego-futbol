@@ -30,6 +30,16 @@ npm run lint
 npm run build
 ```
 
+## Modo local (aplicación de escritorio para Windows)
+
+Para probar el juego en un ordenador, sin internet ni cuentas: el mismo código y las mismas migraciones, con PostgreSQL incrustado (PGlite) guardado en la carpeta de datos del usuario (`%APPDATA%\Manager de Futbol\datos`).
+
+- Cada subida a `main` compila el instalador en GitHub Actions (workflow *Instalador de Windows*); se descarga desde la pestaña Actions, en *Artifacts*.
+- En desarrollo: `DATOS_LOCALES=./datos-locales npm run dev` activa el modo local en el navegador.
+- `npm run dist:windows` crea el instalador en una máquina Windows.
+
+Al no estar firmado, Windows avisa la primera vez: "Más información" → "Ejecutar de todas formas".
+
 ## Principios que no se negocian
 
 - Nunca se puede pagar para ganar: con dinero real solo cosméticos, comodidad y una aceleración limitada de obras.

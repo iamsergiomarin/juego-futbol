@@ -4,7 +4,7 @@
 -- Importes en euros del juego, como bigint (sin decimales).
 -- =============================================================================
 
-create extension if not exists pgcrypto;
+-- gen_random_uuid() viene incluido en PostgreSQL 13+ (Supabase y la base local).
 
 -- -----------------------------------------------------------------------------
 -- Tipos

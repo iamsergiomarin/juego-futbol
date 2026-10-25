@@ -17,6 +17,8 @@ Juego online de mánager de fútbol (proyecto personal de Sergio). El diseño se
 - `src/dominio/reglas.ts`: reglas acordadas en el diseño. Cualquier cifra económica nueva va aquí, no repartida por el código.
 - `supabase/migrations/`: esquema SQL. Nunca editar una migración ya aplicada; crear una nueva.
 - `scripts/calibrar.ts`: batería de calibración del motor.
+- `src/servidor/bd.ts`: acceso a datos. Modo local (PGlite, si existe `DATOS_LOCALES`) y, más adelante, Supabase. Las migraciones se empaquetan en `src/servidor/migraciones.generadas.ts` (`npm run migraciones`); no editarlo a mano.
+- `desktop/`: aplicación de escritorio (Electron) que arranca el servidor autónomo de Next en local. Instalador de Windows en `.github/workflows/escritorio-windows.yml`.
 
 ## Reglas de trabajo
 
