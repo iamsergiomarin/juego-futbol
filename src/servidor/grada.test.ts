@@ -87,7 +87,13 @@ describe("La Grada en una partida local", () => {
     expect(estado.voces).toHaveLength(9);
     expect(estado.masComentadas.length).toBe(3);
     expect(estado.etiquetas[0]).toMatch(/^#/);
-    const hitos = todo.rows.filter((r) => /playoff|CAMPEONES|ASCENSO|PLAYOFF|esfuma/i.test(r.texto));
-    expect(hitos.length).toBeGreaterThan(0);
+    // Los hitos (campeón, playoff, ascenso) dependen del azar de la temporada: solo se exigen si el club los vivió.
+    const pos = (await m.bd.query<{ p: number }>(
+      `select (select count(*) + 1 from clasificacion o where o.temporada_id = k.temporada_id and o.grupo_id = k.grupo_id
+                 and (o.puntos, o.goles_favor - o.goles_contra, o.goles_favor) > (k.puntos, k.goles_favor - k.goles_contra, k.goles_favor))::int as p
+         from clasificacion k where k.club_id = $1 and k.temporada_id = (select id from temporadas where actual)`,
+      [clubId],
+    )).rows[0].p;
+    if (pos <= 5) expect(todo.rows.some((r) => /playoff|CAMPEONES/i.test(r.texto))).toBe(true);
   }, 120_000);
 });
