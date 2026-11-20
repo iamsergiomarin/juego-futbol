@@ -23,6 +23,7 @@ Juego online de mánager de fútbol (proyecto personal de Sergio). El diseño se
 - `src/servidor/mundo.ts`: creación de la partida (club del jugador, grupo de Quinta con bots, plantillas, instalaciones). `src/servidor/consultas.ts`: lecturas para las pantallas.
 - `src/dominio/tactica.ts` (sistemas, puestos, planteamiento y alineación automática), `entrenamiento.ts` (sesiones, progreso por edad, cansancio y lesiones), `mercado.ts` (valor, salarios, ventana y margen del ojeador), `atributos.ts` (nombres en pantalla).
 - `src/servidor/plantilla.ts` (estado de los jugadores, planteamiento y equipo que salta al campo), `mercado.ts` (fichajes, ventas, renovaciones y actividad de los bots), `temporada.ts` (playoff, ascenso y nueva temporada), `noticias.ts` (novedades del cuerpo técnico), `jugador.ts` (ficha con lo que ve el ojeador).
+- `src/dominio/grada.ts` y `gradaTextos.ts` (La Grada: voces, reacciones a partidos y acontecimientos, ánimo; puro y determinista), `src/servidor/grada.ts` (publicaciones, previas y lectura del timeline). Las jornadas se juegan de una en una: no hay botones para simular varias.
 - `src/dominio/nombres.ts`: nombres ficticios. Las localidades son inventadas para no coincidir con clubes reales.
 - `desktop/`: aplicación de escritorio (Electron) que arranca el servidor autónomo de Next en local. Instalador de Windows en `.github/workflows/escritorio-windows.yml`.
 

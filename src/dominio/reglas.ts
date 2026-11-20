@@ -131,6 +131,25 @@ export const ECONOMIA_JORNADA = {
   patrocinioBase: 0.25,
 } as const;
 
+/**
+ * La Grada: ánimo de la afición (0-100). Solo mueve la taquilla; nunca el resultado deportivo.
+ * Los cambios por partido y por noticia están en `dominio/grada.ts`.
+ */
+export const GRADA = {
+  animoInicial: 60,
+  /** Punto al que tiende el ánimo con el paso de las jornadas. */
+  animoNeutro: 55,
+  /** Fracción de la distancia al punto neutro que se recorre cada jornada. */
+  regresionPorJornada: 0.05,
+  /** Efecto del ánimo en la demanda de entradas: neutro en `animoInicial`, entre estos límites. */
+  taquillaMinima: 0.85,
+  taquillaMaxima: 1.15,
+  taquillaPorPunto: 1 / 400,
+  /** Seguidores activos en la red por cada socio (base de los "me gusta"). */
+  seguidoresPorSocio: 0.12,
+  publicacionesPorPagina: 40,
+} as const;
+
 /** Punto de partida de un club recién creado en Quinta. */
 export const CLUB_NUEVO = {
   /** Dinero en caja al empezar, como fracción del presupuesto de Quinta. */

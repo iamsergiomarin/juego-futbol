@@ -14,6 +14,8 @@ import { nombreAtributo } from "@/dominio/atributos";
 import { valorJugador } from "@/dominio/mercado";
 import { ECONOMIA_JORNADA as E, LIGA, division, type NivelDivision } from "@/dominio/reglas";
 import { bdLocal } from "./bd";
+import { factorTaquilla } from "@/dominio/grada";
+import { publicarJornada, publicarPrevias, type LesionPartido } from "./grada";
 import { actividadMercadoJornada } from "./mercado";
 import { publicarNoticia } from "./noticias";
 import { equipoParaPartido, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
@@ -121,7 +123,7 @@ interface PartidoPendiente {
 }
 
 /** Simula un partido y aplica todas sus consecuencias. Devuelve los lesionados en el partido. */
-async function jugarPartido(tx: Transaction, t: { id: number }, jornada: number, p: PartidoPendiente): Promise<Set<string>> {
+async function jugarPartido(tx: Transaction, t: { id: number }, jornada: number, p: PartidoPendiente, lesiones: LesionPartido[]): Promise<Set<string>> {
   const prep = [await equipoParaPartido(tx, p.local), await equipoParaPartido(tx, p.visitante)];
   const [local, visitante] = prep.map((x) => x.equipo) as [EquipoPartido, EquipoPartido];
   const r = simularPartido(local, visitante, p.semilla);
@@ -150,14 +152,15 @@ async function jugarPartido(tx: Transaction, t: { id: number }, jornada: number,
 
   // Taquilla y restauración del local
   const club = (
-    await tx.query<{ masa: number; aforo: number; puntos: number }>(
-      `select c.masa_social as masa, coalesce(sum(s.aforo), 0)::int as aforo, coalesce(sum(s.puntos_venta), 0)::int as puntos
+    await tx.query<{ masa: number; animo: number; aforo: number; puntos: number }>(
+      `select c.masa_social as masa, c.animo_grada as animo, coalesce(sum(s.aforo), 0)::int as aforo, coalesce(sum(s.puntos_venta), 0)::int as puntos
          from clubes c left join sectores_estadio s on s.club_id = c.id where c.id = $1 group by c.id`,
       [p.local],
     )
   ).rows[0];
   const extraPlayoff = p.competicion === "playoff" ? 1.4 : 1;
-  const demanda = (club.masa * E.demandaPorSocio + E.publicoOcasional) * extraPlayoff * uniforme(rng, 0.85, 1.15);
+  // La grada animada llena más el campo: el ánimo mueve la demanda, nunca el resultado.
+  const demanda = (club.masa * E.demandaPorSocio + E.publicoOcasional) * extraPlayoff * factorTaquilla(club.animo) * uniforme(rng, 0.85, 1.15);
   const asistencia = Math.min(club.aforo, Math.round(demanda));
   const atendidos = Math.min(asistencia, club.puntos * E.aforoPorPuntoVenta);
 
@@ -201,6 +204,7 @@ async function jugarPartido(tx: Transaction, t: { id: number }, jornada: number,
           jornadasLesion = l.jornadas;
           tipoLesion = l.tipo;
           lesionados.add(j.id);
+          lesiones.push({ clubId, nombre: nombreDe(j), tipo: l.tipo, jornadas: l.jornadas });
           await publicarNoticia(tx, clubId, "lesion", `Lesión de ${nombreDe(j)}`,
             `${l.tipo} en el partido de la jornada ${jornada}. Estará ${l.jornadas === 1 ? "una jornada" : `${l.jornadas} jornadas`} de baja.`, jornada);
         }
@@ -375,7 +379,10 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
     ).rows;
 
     const lesionados = new Set<string>();
-    for (const p of partidos) for (const id of await jugarPartido(tx, t, siguiente, p)) lesionados.add(id);
+    const lesionesPartido: LesionPartido[] = [];
+    for (const p of partidos) for (const id of await jugarPartido(tx, t, siguiente, p, lesionesPartido)) lesionados.add(id);
+    // La grada reacciona a los resultados (antes de que el calendario avance al playoff).
+    await publicarJornada(tx, siguiente, partidos, lesionesPartido);
 
     // Cierre de semana de liga (jornada del sábado): salarios, televisión y patrocinio.
     const deLiga = partidos.some((p) => p.competicion === "liga");
@@ -405,6 +412,7 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
     // Fin de la liga: arranca el playoff. Tras cada ronda de playoff, la siguiente.
     if (deLiga && siguiente >= LIGA.jornadas) await crearPlayoff(tx, t.id);
     else if (!deLiga) await avanzarPlayoff(tx, t.id);
+    await publicarPrevias(tx);
 
     const quedan = (
       await tx.query<{ n: number }>(

@@ -3,11 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Foco, PlanEntrenamiento } from "@/dominio/entrenamiento";
-import { LIGA } from "@/dominio/reglas";
 import type { Planteamiento } from "@/dominio/tactica";
 import { modoLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
-import { jugarJornadas } from "@/servidor/liga";
+import { jugarSiguienteJornada } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
 import { ErrorPlanteamiento, guardarEntrenamiento, guardarPlanteamiento } from "@/servidor/plantilla";
 import { ErrorTemporada, nuevaTemporada } from "@/servidor/temporada";
@@ -26,12 +25,14 @@ function volver(ruta: string, aviso: { ok?: string; error?: string }): never {
   redirect(`${ruta}${ruta.includes("?") ? "&" : "?"}${q.toString()}`);
 }
 
-/** Modo local: juega una o varias jornadas y vuelve al inicio con los resultados. */
-export async function avanzarJornadas(formulario: FormData): Promise<void> {
+/**
+ * Modo local: juega la siguiente jornada, solo una. No hay atajos para simular varias:
+ * cada jornada trae su semana de entrenamiento, sus noticias y la reacción de la grada.
+ * En el modo online esta acción no existe: los partidos se juegan a su hora.
+ */
+export async function avanzarJornadas(): Promise<void> {
   await miClub();
-  // "Hasta el final" incluye el playoff, que se crea al terminar la liga.
-  const cantidad = Math.max(1, Math.min(LIGA.jornadas + 10, Number(formulario.get("cantidad")) || 1));
-  await jugarJornadas(cantidad);
+  await jugarSiguienteJornada();
   revalidatePath("/", "layout");
   redirect("/inicio");
 }

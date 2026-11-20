@@ -3,34 +3,30 @@
 import { useFormStatus } from "react-dom";
 import { avanzarJornadas } from "@/app/(juego)/acciones";
 
-function Boton({ cantidad, children, principal }: { cantidad: number; children: React.ReactNode; principal?: boolean }) {
-  const { pending, data } = useFormStatus();
-  const esteBoton = pending && data?.get("cantidad") === String(cantidad);
+function Boton({ texto }: { texto: string }) {
+  const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      name="cantidad"
-      value={cantidad}
       disabled={pending}
-      className={
-        "rounded-full px-4 py-2 text-sm font-semibold transition-opacity disabled:opacity-60 " +
-        (principal ? "bg-cesped text-white dark:text-black" : "border border-borde bg-superficie hover:bg-fondo")
-      }
+      className="rounded-full bg-cesped px-5 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-60 dark:text-black"
     >
-      {esteBoton ? "Jugando…" : children}
+      {pending ? "Jugando…" : texto}
     </button>
   );
 }
 
-/** Modo local: el jugador decide cuándo avanza el calendario. */
-export function BotonesJornada({ restantes }: { restantes: number }) {
+/**
+ * Avance del calendario. En el modo local el jugador juega la jornada cuando quiere, de una en una.
+ * En el online nadie la adelanta: los partidos se disputan a su hora para todos.
+ */
+export function BotonesJornada({ local, cuando, texto = "Jugar la jornada" }: { local: boolean; cuando?: string; texto?: string }) {
+  if (!local) {
+    return <p className="text-sm text-suave first-letter:uppercase">{cuando ? `Se juega ${cuando}` : "Se juega a su hora"}, como para todos los clubes.</p>;
+  }
   return (
-    <form action={avanzarJornadas} className="flex flex-wrap items-center gap-2">
-      <Boton cantidad={1} principal>
-        Jugar la jornada
-      </Boton>
-      {restantes > 1 ? <Boton cantidad={Math.min(5, restantes)}>Simular {Math.min(5, restantes)} jornadas</Boton> : null}
-      {restantes > 1 ? <Boton cantidad={99}>Hasta el final</Boton> : null}
+    <form action={avanzarJornadas}>
+      <Boton texto={texto} />
     </form>
   );
 }

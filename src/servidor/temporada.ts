@@ -6,6 +6,7 @@ import { MERCADO_LOCAL } from "@/dominio/mercado";
 import { bdLocal } from "./bd";
 import { asegurarCalendario, movimiento } from "./liga";
 import { generarAgentesLibres, insertarClubBot, isoFecha, nombresUsados, proximoLunes } from "./mundo";
+import { publicarEvento } from "./grada";
 import { publicarNoticia } from "./noticias";
 
 /** Prima de ascenso: fracción del presupuesto de la nueva división. */
@@ -38,15 +39,21 @@ async function crearPartido(tx: Transaction, temporadaId: number, grupo: number,
 export async function crearPlayoff(tx: Transaction, temporadaId: number): Promise<void> {
   const fecha = await ultimaFecha(tx, temporadaId);
   fecha.setUTCDate(fecha.getUTCDate() + 2);
-  const grupos = (await tx.query<{ id: number }>("select id from grupos where abierto")).rows;
+  const grupos = (await tx.query<{ id: number; division: number }>("select id, division from grupos where abierto")).rows;
   for (const g of grupos) {
     const tabla = await clasificacionGrupo(tx, temporadaId, g.id);
     if (tabla.length < 5) continue;
     await crearPartido(tx, temporadaId, g.id, "Semifinal", LIGA.jornadas + 1, fecha, tabla[1], tabla[4]);
     await crearPartido(tx, temporadaId, g.id, "Semifinal", LIGA.jornadas + 1, fecha, tabla[2], tabla[3]);
     for (const [i, club] of tabla.entries()) {
-      if (i === 0) await publicarNoticia(tx, club, "temporada", "¡Campeones del grupo!", "Primer puesto: ascenso directo a la siguiente división.", LIGA.jornadas);
-      else if (i <= 4) await publicarNoticia(tx, club, "temporada", "A jugar el playoff de ascenso", `Terminamos ${i + 1}.º. Semifinal a partido único: el mejor clasificado juega en casa.`, LIGA.jornadas);
+      if (i === 0) {
+        await publicarNoticia(tx, club, "temporada", "¡Campeones del grupo!", "Primer puesto: ascenso directo a la siguiente división.", LIGA.jornadas);
+        const puntos = (await tx.query<{ p: number }>("select puntos::int as p from clasificacion where temporada_id = $1 and club_id = $2", [temporadaId, club])).rows[0]?.p ?? 0;
+        await publicarEvento(tx, club, { tipo: "campeon", puntos, division: division(g.division as NivelDivision).nombre, siguiente: division(Math.max(0, g.division - 1) as NivelDivision).nombre });
+      } else if (i <= 4) {
+        await publicarNoticia(tx, club, "temporada", "A jugar el playoff de ascenso", `Terminamos ${i + 1}.º. Semifinal a partido único: el mejor clasificado juega en casa.`, LIGA.jornadas);
+        await publicarEvento(tx, club, { tipo: "playoff", posicion: i + 1 });
+      }
     }
   }
   await tx.query("update temporadas set fase = 'playoff' where id = $1", [temporadaId]);
@@ -95,7 +102,9 @@ export async function avanzarPlayoff(tx: Transaction, temporadaId: number): Prom
       fecha.setUTCDate(fecha.getUTCDate() + 5);
       await crearPartido(tx, temporadaId, g.id, "Final", LIGA.jornadas + 2, fecha, a, b);
       pendiente = true;
+      for (const s of semis) for (const id of [s.local, s.visitante]) if (id !== s.ganador) await publicarEvento(tx, id, { tipo: "eliminado", ronda: "Semifinal" });
     } else if (!cruce) {
+      for (const id of [final.local, final.visitante]) if (id !== final.ganador) await publicarEvento(tx, id, { tipo: "eliminado", ronda: "Final" });
       // El campeón del playoff del grupo hermano: un rival exigente que no juega en nuestro grupo.
       const t = (await tx.query<{ numero: number; inicio: string }>("select numero, to_char(inicio, 'YYYY-MM-DD') as inicio from temporadas where id = $1", [temporadaId])).rows[0];
       const nivel = (
@@ -115,6 +124,13 @@ export async function avanzarPlayoff(tx: Transaction, temporadaId: number): Prom
       const casa = rng() < 0.5;
       await crearPartido(tx, temporadaId, g.id, "Cruce de ascenso", LIGA.jornadas + 3, fecha, casa ? final.ganador! : hermano, casa ? hermano : final.ganador!);
       pendiente = true;
+    } else {
+      // Cruce de ascenso jugado: el ganador sube, el otro se queda.
+      for (const id of [cruce.local, cruce.visitante]) {
+        if (id === cruce.ganador) {
+          await publicarEvento(tx, id, { tipo: "ascenso", division: division(g.division as NivelDivision).nombre, siguiente: division(Math.max(0, g.division - 1) as NivelDivision).nombre });
+        } else await publicarEvento(tx, id, { tipo: "eliminado", ronda: "Cruce de ascenso" });
+      }
     }
   }
   if (!pendiente) await tx.query("update temporadas set fase = 'terminada' where id = $1", [temporadaId]);
@@ -343,6 +359,7 @@ export async function nuevaTemporada(clubId: string): Promise<number> {
     ].filter(Boolean).join(" ");
     await publicarNoticia(tx, clubId, "temporada", `Arranca la temporada ${t.numero + 1}`,
       `${textoAscenso}${detalles || "La plantilla sigue al completo."} La liga empieza el lunes ${inicio.toLocaleDateString("es-ES", { day: "numeric", month: "long" })}.`, 0);
+    await publicarEvento(tx, clubId, { tipo: "nueva_temporada", numero: t.numero + 1, division: division(divisionActiva).nombre });
     return t.numero + 1;
   });
   await asegurarCalendario();

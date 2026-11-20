@@ -6,17 +6,18 @@ import { BotonesJornada } from "@/componentes/juego/BotonesJornada";
 import { Caja } from "@/componentes/juego/Caja";
 import { TablaClasificacion } from "@/componentes/juego/Clasificacion";
 import { Novedades } from "@/componentes/juego/Novedades";
+import { BarraAnimo, Publicacion } from "@/componentes/juego/Publicacion";
 import { PartidosDelClub } from "@/componentes/juego/Partidos";
-import { bdLocal } from "@/servidor/bd";
+import { bdLocal, modoLocal } from "@/servidor/bd";
 import {
   cabeceraClub,
   clasificacion,
   estadoTemporada,
-  jornadasPendientes,
   managerLocal,
   partidosClub,
   resumenEconomia,
 } from "@/servidor/consultas";
+import { estadoGrada, lineaDeTiempo } from "@/servidor/grada";
 import { ultimasNoticias } from "@/servidor/noticias";
 import { jugadoresEstado, planteamientoClub } from "@/servidor/plantilla";
 import { resumenTemporada } from "@/servidor/temporada";
@@ -37,7 +38,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const manager = (await managerLocal())!;
   const club = (await cabeceraClub(manager.clubId))!;
   const bd = await bdLocal();
-  const [temporada, tabla, jugados, pendientes, economia, noticias, resumen, quedan, jugadores] = await Promise.all([
+  const [temporada, tabla, jugados, pendientes, economia, noticias, resumen, jugadores, grada, ultimasGrada] = await Promise.all([
     estadoTemporada(),
     clasificacion(club.grupoId),
     partidosClub(club.id, "jugados", 5),
@@ -45,8 +46,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     resumenEconomia(club.id),
     ultimasNoticias(bd, club.id, 8),
     resumenTemporada(club.id),
-    jornadasPendientes(),
     jugadoresEstado(bd, club.id),
+    estadoGrada(bd, club.id),
+    lineaDeTiempo(bd, club.id, "todo", 4),
   ]);
   const planteamiento = await planteamientoClub(bd, club.id, jugadores);
   const [proximo, ...siguientes] = pendientes;
@@ -123,7 +125,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                 </Link>
               </div>
               <div className="mt-5 flex justify-end border-t border-borde pt-4">
-                <BotonesJornada restantes={quedan} />
+                <BotonesJornada local={modoLocal()} cuando={formatoFechaHora(proximo.inicio)} />
               </div>
             </>
           ) : resumen?.fase === "terminada" && resumen.desenlace ? (
@@ -166,7 +168,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                 ))}
               </ul>
               <div className="mx-auto">
-                <BotonesJornada restantes={quedan} />
+                <BotonesJornada local={modoLocal()} texto="Jugar la ronda" />
               </div>
             </div>
           )}
@@ -236,6 +238,24 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             ) : null}
           </Caja>
         </div>
+
+        {/* La Grada */}
+        <Caja titulo="La Grada" className="lg:col-span-12" enlace={{ href: "/grada", texto: "Ver todo" }} sinRelleno>
+          <div className="grid gap-x-6 lg:grid-cols-12">
+            <div className="px-5 pb-5 lg:col-span-3">
+              <p className="text-xs text-suave">Ambiente</p>
+              <div className="mt-1">
+                <BarraAnimo animo={grada.animo} etiqueta={grada.etiqueta} tono={grada.tono} />
+              </div>
+            </div>
+            <div className="grid divide-y divide-borde border-t border-borde lg:col-span-9 lg:grid-cols-2 lg:divide-x lg:divide-y-0 lg:border-t-0 lg:border-l">
+              {ultimasGrada.slice(0, 2).map((p) => (
+                <Publicacion key={p.id} p={p} sinRespuestas />
+              ))}
+              {ultimasGrada.length === 0 ? <p className="p-5 text-sm text-suave">La grada aún no ha dicho nada.</p> : null}
+            </div>
+          </div>
+        </Caja>
       </div>
     </>
   );

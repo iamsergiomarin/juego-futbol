@@ -5,6 +5,7 @@ import { MERCADO, TOPE_DIRECCION_DEPORTIVA, division, type NivelDivision } from 
 import { bdLocal } from "./bd";
 import { movimiento } from "./liga";
 import { generarAgentesLibres } from "./mundo";
+import { publicarEvento } from "./grada";
 import { publicarNoticia } from "./noticias";
 
 type Consulta = PGlite | Transaction;
@@ -134,9 +135,10 @@ export async function ficharJugador(clubId: string, jugadorId: string, temporada
     const c = await contexto(tx);
     const est = await estadoMercado(clubId, tx);
     const j = (
-      await tx.query<{ id: string; nombre: string; apellido: string; media: number; valor: number; precio: number | null; salario: number; personalidad: string; club: string | null }>(
+      await tx.query<{ id: string; nombre: string; apellido: string; media: number; valor: number; precio: number | null; salario: number; personalidad: string; club: string | null; posicion: "POR" | "DEF" | "MED" | "DEL"; edad: number }>(
         `select id, nombre, apellido, media::float8 as media, valor_mercado::float8 as valor, precio_venta::float8 as precio,
-                salario::float8 as salario, personalidad, club_id as club
+                salario::float8 as salario, personalidad, club_id as club, posicion,
+                date_part('year', age((select inicio from temporadas where actual), fecha_nacimiento))::int as edad
            from jugadores where id = $1 and not retirado for update`,
         [jugadorId],
       )
@@ -184,6 +186,7 @@ export async function ficharJugador(clubId: string, jugadorId: string, temporada
         ? `Llega como agente libre. Prima de fichaje: ${prima.toLocaleString("es-ES")} €. Salario: ${salario.toLocaleString("es-ES")} € por temporada.`
         : `Traspaso de ${precio.toLocaleString("es-ES")} € (más ${comision.toLocaleString("es-ES")} € de comisión). Salario: ${salario.toLocaleString("es-ES")} € por temporada.`,
       c.jugadas || null);
+    await publicarEvento(tx, clubId, { tipo: "fichaje", jugador: nombre, posicion: j.posicion, media: j.media, edad: j.edad, libre, precio });
     return nombre;
   });
 }
@@ -214,6 +217,7 @@ export async function renovarContrato(clubId: string, jugadorId: string, tempora
     await tx.query("update jugadores set salario = $3, contrato_hasta = $4, moral = least(95, moral + 5) where id = $1 and club_id = $2", [jugadorId, clubId, salario, hasta]);
     await publicarNoticia(tx, clubId, "contrato", `Renovación de ${j.nombre} ${j.apellido}`,
       `Firma hasta la temporada ${hasta} con un salario de ${salario.toLocaleString("es-ES")} € por temporada.`, null);
+    await publicarEvento(tx, clubId, { tipo: "renovacion", jugador: `${j.nombre} ${j.apellido}`, media: j.media, hasta });
     return hasta;
   });
 }
@@ -278,8 +282,9 @@ export async function actividadMercadoJornada(tx: Transaction, temporadaId: numb
   // Ofertas de los bots por los jugadores en venta del mánager.
   if (!ventanaAbierta(c.jugadas, c.fase)) return;
   const enVenta = (
-    await tx.query<{ id: string; nombre: string; apellido: string; club: string; precio: number; valor: number }>(
-      `select j.id, j.nombre, j.apellido, j.club_id as club, j.precio_venta::float8 as precio, j.valor_mercado::float8 as valor
+    await tx.query<{ id: string; nombre: string; apellido: string; club: string; precio: number; valor: number; media: number; posicion: "POR" | "DEF" | "MED" | "DEL"; edad: number }>(
+      `select j.id, j.nombre, j.apellido, j.club_id as club, j.precio_venta::float8 as precio, j.valor_mercado::float8 as valor,
+              j.media::float8 as media, j.posicion, date_part('year', age((select inicio from temporadas where actual), j.fecha_nacimiento))::int as edad
          from jugadores j join clubes c on c.id = j.club_id where c.manager_id is not null and j.precio_venta is not null`,
     )
   ).rows;
@@ -301,5 +306,6 @@ export async function actividadMercadoJornada(tx: Transaction, temporadaId: numb
     );
     await publicarNoticia(tx, j.club, "venta", `Vendido: ${j.nombre} ${j.apellido}`,
       `${nombreComprador} paga ${j.precio.toLocaleString("es-ES")} € por su traspaso.`, jornada);
+    await publicarEvento(tx, j.club, { tipo: "venta", jugador: `${j.nombre} ${j.apellido}`, posicion: j.posicion, media: j.media, edad: j.edad, precio: j.precio, comprador: nombreComprador });
   }
 }

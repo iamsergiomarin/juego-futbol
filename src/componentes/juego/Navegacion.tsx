@@ -9,6 +9,7 @@ const SECCIONES = [
   { href: "/club", etiqueta: "Club", prefijos: ["/club"] },
   { href: "/equipo", etiqueta: "Equipo", prefijos: ["/equipo", "/jugador"] },
   { href: "/competicion", etiqueta: "Competición", prefijos: ["/competicion", "/partido"] },
+  { href: "/grada", etiqueta: "La Grada", prefijos: ["/grada"] },
 ];
 
 export function Navegacion({

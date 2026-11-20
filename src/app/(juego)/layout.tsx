@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Navegacion } from "@/componentes/juego/Navegacion";
 import { modoLocal } from "@/servidor/bd";
 import { cabeceraClub, estadoTemporada, managerLocal } from "@/servidor/consultas";
+import { asegurarGrada } from "@/servidor/grada";
 import { asegurarCalendario } from "@/servidor/liga";
 import { asegurarMercado } from "@/servidor/mercado";
 
@@ -15,6 +16,7 @@ export default async function LayoutJuego({ children }: { children: React.ReactN
   // Partidas creadas antes de que existiera la liga reciben aquí su calendario.
   await asegurarCalendario();
   await asegurarMercado();
+  await asegurarGrada();
   const [club, temporada] = await Promise.all([cabeceraClub(manager.clubId), estadoTemporada()]);
   if (!club) redirect("/nuevo");
 
