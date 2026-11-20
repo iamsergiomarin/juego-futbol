@@ -196,7 +196,7 @@ export const PRENSA_CRONICA: Banco = {
   empate: ["#{etiqueta} | {club} y {rival} reparten puntos ({resultado}). {destacado}", "#{etiqueta} | Tablas en el marcador: {resultado} entre {club} y {rival}. {destacado}"],
   empate_final: ["#{etiqueta} | {club} rescata un punto en el tramo final ante {rival} ({resultado}). {destacado}", "#{etiqueta} | Gol tardío y tablas: {resultado} entre {club} y {rival}. {destacado}"],
   empate0: ["#{etiqueta} | Ni goles ni ocasiones claras: {club} y {rival} firman tablas sin goles.", "#{etiqueta} | Empate sin goles entre {club} y {rival} ({resultado})."],
-  derrota: ["#{etiqueta} | {club} cae ante {rival} ({resultado}) y se complica la jornada. {destacado}", "#{etiqueta} | Tropiezo de {club}: {rival} gana {resultado}. {destacado}"],
+  derrota: ["#{etiqueta} | {club} cae ante {rival} ({resultado}) y se complica la jornada. {destacado}", "#{etiqueta} | Tropiezo de {club}: pierde ante {rival} ({resultado}). {destacado}"],
   derrota_dura: ["#{etiqueta} | Correctivo para {club}: {rival} golea ({resultado}) y deja muchas dudas.", "#{etiqueta} | Goleada en contra: {club} naufraga ante {rival} ({resultado})."],
   derrota_tarde: ["#{etiqueta} | Mazazo al final: {rival} le arrebata el partido a {club} ({resultado}).", "#{etiqueta} | {club} se queda sin nada en el tramo final ante {rival} ({resultado})."],
 };
