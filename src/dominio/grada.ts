@@ -457,7 +457,8 @@ export type EventoClub =
   | { tipo: "playoff"; club: string; posicion: number }
   | { tipo: "ascenso"; club: string; division: string; siguiente: string }
   | { tipo: "eliminado"; club: string; ronda: string | null }
-  | { tipo: "nueva_temporada"; club: string; numero: number; division: string };
+  | { tipo: "nueva_temporada"; club: string; numero: number; division: string }
+  | { tipo: "patrocinio"; club: string; marca: string; espacio: string; perfil: "local" | "multinacional" | "apuestas"; temporadas: number; importe: number };
 
 export interface ReaccionEvento {
   borradores: Borrador[];
@@ -589,6 +590,25 @@ export function reaccionesEvento(ev: EventoClub, voces: Voz[], rng: Rng): Reacci
       b.poner(pena, ["Orgullosos igualmente. El año que viene, otra vez."], 0.8, "neutro");
       b.poner(optimista, ["Duele, pero estamos más cerca que nunca. Vamos a por la próxima."], 0.6, "neutro");
       animo = -6;
+      break;
+    }
+    case "patrocinio": {
+      Object.assign(vars, { marca: ev.marca, espacio: ev.espacio.toLowerCase(), temporadas: ev.temporadas, importe: formatoMiles(ev.importe) });
+      b.poner(oficial, ["🤝 PATROCINIO | {marca} será {espacio} de {club} durante {temporadas} temporada(s). ¡Bienvenidos a la familia!"], 1, "positivo");
+      b.poner(cronista, ["{club} cierra un acuerdo con {marca} ({importe} € al año) para el {espacio}."], 0.8, "neutro");
+      if (ev.perfil === "apuestas") {
+        b.poner(pesimista, ["¿Una casa de apuestas en la camiseta? Dinero es dinero, pero no me gusta."], 0.8, "negativo");
+        b.poner(polemico, ["{club} vende su imagen a una casa de apuestas. Los números cuadran; el símbolo, mucho menos."], 1.1, "negativo");
+        animo = -2;
+      } else if (ev.perfil === "local") {
+        b.poner(optimista, ["Una empresa de aquí, de la tierra. ¡Eso sí que es sentirse club!"], 0.7, "positivo");
+        b.poner(pena, ["Que sea una marca de casa nos gusta. Pasaremos a saludar."], 0.6, "positivo");
+        animo = 2;
+      } else {
+        b.poner(optimista, ["Más músculo económico para el club. ¡Bien!"], 0.5, "positivo");
+        b.poner(bromista, ["Ya podemos comprar balones nuevos. Y quizá un banderín."], 0.5, "neutro");
+        animo = 1;
+      }
       break;
     }
     case "nueva_temporada": {

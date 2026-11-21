@@ -5,5 +5,5 @@ export const PESTANAS_CLUB: Pestana[] = [
   { href: "/club/instalaciones", etiqueta: "Instalaciones" },
   { href: "/club/personal", etiqueta: "Cuerpo técnico" },
   { href: "/club/economia", etiqueta: "Economía" },
-  { href: "/club/patrocinio", etiqueta: "Patrocinio", proximamente: true },
+  { href: "/club/patrocinio", etiqueta: "Patrocinio" },
 ];

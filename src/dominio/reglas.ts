@@ -80,7 +80,36 @@ export const MERCADO = {
 export const PATROCINIO = {
   frontal: 0.15,
   marcaDeportiva: 0.1,
+  /** Sin contrato, el hueco rinde esta fracción de lo que pagaría una marca normal. */
+  sinContrato: 0.6,
+  /** Prima variable: fracción de la parte fija que se cobra si se cumple el objetivo de posición. */
+  primaObjetivo: 0.15,
+  /** Objetivo de los contratos: acabar la liga entre los N primeros del grupo. */
+  objetivoPosicion: 6,
+  duracionMinima: 1,
+  duracionMaxima: 3,
+  /** Margen oculto de cada marca: hasta cuánto más aceptaría pagar si se contraoferta (fracción). */
+  margenContraoferta: [0.04, 0.22],
+  /** Una marca satisfecha que renueva paga esta fracción más. */
+  alzaRenovacion: 0.1,
+  /** Satisfacción (0-100): por encima renueva, por debajo se marcha. */
+  satisfaccionRenueva: 60,
+  satisfaccionSeMarcha: 30,
+  satisfaccionInicial: 50,
 } as const;
+
+/** Perfiles de marca ficticia: cuánto pagan frente a la base y cómo afectan a la popularidad del club por temporada. */
+export const PERFILES_PATROCINIO = {
+  local: { nombre: "Empresa local", pago: 0.85, popularidad: 2 },
+  multinacional: { nombre: "Multinacional", pago: 1.0, popularidad: 0 },
+  apuestas: { nombre: "Casa de apuestas", pago: 1.2, popularidad: -3 },
+} as const;
+export type PerfilPatrocinio = keyof typeof PERFILES_PATROCINIO;
+export type EspacioPatrocinio = "frontal" | "marca_deportiva";
+export const ESPACIOS_PATROCINIO: Record<EspacioPatrocinio, { nombre: string; fraccion: number }> = {
+  frontal: { nombre: "Frontal de la camiseta", fraccion: PATROCINIO.frontal },
+  marca_deportiva: { nombre: "Marca deportiva", fraccion: PATROCINIO.marcaDeportiva },
+};
 
 /** Duración máxima de obra: 48 horas. */
 export const OBRAS_HORAS = {

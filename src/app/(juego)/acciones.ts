@@ -8,6 +8,7 @@ import { modoLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
 import { jugarSiguienteJornada } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
+import { aceptarOferta, contraofertar, ErrorPatrocinio, rechazarOferta } from "@/servidor/patrocinio";
 import { ErrorPlanteamiento, guardarEntrenamiento, guardarPlanteamiento } from "@/servidor/plantilla";
 import { ErrorTemporada, nuevaTemporada } from "@/servidor/temporada";
 
@@ -116,6 +117,30 @@ export async function renovar(formulario: FormData): Promise<void> {
     volver(`/jugador/${jugador}`, { ok: `Renovado hasta la temporada ${hasta}.` });
   } catch (e) {
     if (e instanceof ErrorMercado) volver(`/jugador/${jugador}`, { error: e.message });
+    throw e;
+  }
+}
+
+/** Respuesta a una oferta de patrocinio: aceptar, rechazar o contraofertar (una sola vez). */
+export async function responderOferta(formulario: FormData): Promise<void> {
+  const club = await miClub();
+  const id = String(formulario.get("oferta"));
+  const accion = String(formulario.get("accion"));
+  const ruta = "/club/patrocinio";
+  try {
+    if (accion === "aceptar") {
+      await aceptarOferta(club, id);
+      volver(ruta, { ok: "Contrato firmado. La afición ya lo comenta en La Grada." });
+    } else if (accion === "rechazar") {
+      await rechazarOferta(club, id);
+      volver(ruta, { ok: "Oferta rechazada." });
+    } else {
+      const subida = Number(accion.replace("contra", "")) / 100;
+      const r = await contraofertar(club, id, subida);
+      volver(ruta, r.aceptada ? { ok: `${r.marca} acepta la contraoferta: el contrato mejora.` } : { error: `${r.marca} no quiere pagar tanto y retira su oferta.` });
+    }
+  } catch (e) {
+    if (e instanceof ErrorPatrocinio) volver(ruta, { error: e.message });
     throw e;
   }
 }

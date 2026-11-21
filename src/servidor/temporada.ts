@@ -7,6 +7,7 @@ import { bdLocal } from "./bd";
 import { asegurarCalendario, movimiento } from "./liga";
 import { generarAgentesLibres, insertarClubBot, isoFecha, nombresUsados, proximoLunes } from "./mundo";
 import { publicarEvento } from "./grada";
+import { liquidarPatrocinios } from "./patrocinio";
 import { publicarNoticia } from "./noticias";
 
 /** Prima de ascenso: fracción del presupuesto de la nueva división. */
@@ -247,6 +248,9 @@ export async function nuevaTemporada(clubId: string): Promise<number> {
         [t.id, id, club.division, club.grupo, i + 1, puntos, d],
       );
     }
+
+    // Los patrocinadores liquidan la temporada: primas por objetivo, satisfacción y popularidad.
+    await liquidarPatrocinios(tx, clubId, t, tabla.indexOf(clubId) + 1);
 
     // Nueva temporada
     const fin = await ultimaFecha(tx, t.id);

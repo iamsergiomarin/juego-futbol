@@ -17,6 +17,7 @@ import { bdLocal } from "./bd";
 import { factorTaquilla } from "@/dominio/grada";
 import { publicarJornada, publicarPrevias, type LesionPartido } from "./grada";
 import { actividadMercadoJornada } from "./mercado";
+import { pagarPatrocinios } from "./patrocinio";
 import { publicarNoticia } from "./noticias";
 import { equipoParaPartido, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
 import { avanzarPlayoff, crearPlayoff } from "./temporada";
@@ -389,8 +390,8 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
     if (deLiga && siguiente % 2 === 0) {
       const semanas = LIGA.jornadas / 2;
       const clubes = (
-        await tx.query<{ id: string; division: NivelDivision; jugadores: number; personal: number }>(
-          `select c.id, g.division,
+        await tx.query<{ id: string; division: NivelDivision; humano: boolean; jugadores: number; personal: number }>(
+          `select c.id, g.division, c.manager_id is not null as humano,
                   coalesce((select sum(salario) from jugadores j where j.club_id = c.id), 0)::float8 as jugadores,
                   coalesce((select sum(salario) from personal s where s.club_id = c.id), 0)::float8 as personal
              from clubes c join grupos g on g.id = c.grupo_id where g.abierto`,
@@ -401,8 +402,8 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
         await movimiento(tx, c.id, t.id, siguiente, "Salarios de la plantilla", -c.jugadores / semanas);
         await movimiento(tx, c.id, t.id, siguiente, "Salarios del cuerpo técnico", -c.personal / semanas);
         await movimiento(tx, c.id, t.id, siguiente, "Derechos de televisión", (presupuesto * E.televisionFija) / semanas);
-        await movimiento(tx, c.id, t.id, siguiente, "Patrocinio", (presupuesto * E.patrocinioBase) / semanas);
       }
+      await pagarPatrocinios(tx, t, siguiente, clubes, semanas, E.patrocinioBase);
     }
 
     const rng = crearRng(Math.floor(partidos[0]?.semilla ?? 1) + 7);
