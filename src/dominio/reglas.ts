@@ -213,3 +213,30 @@ export function valorOrientativo(media: number): number {
   const ultimo = puntos[puntos.length - 1];
   return Math.round(valor(ultimo) * 1.6 ** ((media - ultimo.mediaTipica) / 0.5));
 }
+
+/** Obras de instalaciones: coste por nivel de destino (nivel × base) y duración (máximo 48 h). Cifras de partida. */
+export const OBRAS_EDIFICIOS = {
+  nivelMaximo: 5,
+  base: { estadio: 350_000, sede: 250_000, ciudad_deportiva: 300_000, centro_medico: 200_000, escuela_cantera: 300_000 },
+  horasBase: 8,
+  horasPorNivel: 8,
+  horasMaximas: 48,
+  /** El estadio gana este aforo en la tribuna por nivel. */
+  aforoPorNivelEstadio: 1000,
+  /** Probabilidad extra, por nivel del centro médico, de recortar una jornada de baja. */
+  recuperacionPorNivelMedico: 0.1,
+} as const;
+export type EdificioObra = keyof typeof OBRAS_EDIFICIOS.base;
+
+/** Cantera: probabilidad numérica de joya según el nivel de la escuela y ritmo de desarrollo. */
+export const CANTERA_JUEGO = {
+  probabilidadJoya: { 1: 0.02, 2: 0.05, 3: 0.1, 4: 0.18, 5: 0.3 } as Record<number, number>,
+  edadMinima: 15,
+  edadMaxima: 17,
+  /** Edad a la que el juvenil que no recibe contrato se marcha. */
+  edadSalida: 19,
+  /** Cuánto cierra cada semana de la distancia entre su media y su potencial. */
+  crecimientoSemanal: 0.018,
+  /** Diferencia de media con la plantilla por debajo de la cual un juvenil "está listo". */
+  margenListo: 0.8,
+} as const;

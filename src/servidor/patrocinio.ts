@@ -87,7 +87,8 @@ export async function asegurarOfertas(tx: Transaction, clubId: string): Promise<
       )
     ).rows[0];
     const otroEspacio = (await tx.query<{ marca: string }>("select marca from patrocinios where club_id = $1 and espacio <> $2 and hasta_temporada >= $3", [clubId, espacio, t.numero])).rows.map((r) => r.marca);
-    const excluidas = [...otroEspacio];
+    const ofrecidas = (await tx.query<{ marca: string }>("select marca from ofertas_patrocinio where club_id = $1 and temporada_id = $2 and espacio <> $3", [clubId, t.id, espacio])).rows.map((r) => r.marca);
+    const excluidas = [...otroEspacio, ...ofrecidas];
     let renovacion: { marca: string; perfil: PerfilPatrocinio } | undefined;
     if (previo) {
       if (previo.satisfaccion >= PATROCINIO.satisfaccionRenueva) renovacion = { marca: previo.marca, perfil: previo.perfil };
@@ -156,7 +157,8 @@ export async function aceptarOferta(clubId: string, ofertaId: string): Promise<v
       [clubId, o.marca, o.perfil, o.espacio, o.fijo, o.prima, o.objetivoPosicion, t.numero, t.numero + o.duracion - 1, PATROCINIO.satisfaccionInicial],
     );
     await tx.query("update ofertas_patrocinio set estado = 'aceptada' where id = $1", [o.id]);
-    await tx.query("update ofertas_patrocinio set estado = 'retirada' where club_id = $1 and temporada_id = $2 and espacio = $3 and estado = 'pendiente'", [clubId, o.temporadaId, o.espacio]);
+    // La marca no puede patrocinar dos espacios: sus otras ofertas se retiran, igual que las rivales de este espacio.
+    await tx.query("update ofertas_patrocinio set estado = 'retirada' where club_id = $1 and temporada_id = $2 and estado = 'pendiente' and (espacio = $3 or marca = $4)", [clubId, o.temporadaId, o.espacio, o.marca]);
     await publicarEvento(tx, clubId, { tipo: "patrocinio", marca: o.marca, espacio: ESPACIOS_PATROCINIO[o.espacio].nombre, perfil: o.perfil, temporadas: o.duracion, importe: o.fijo });
   });
 }

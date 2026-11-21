@@ -8,6 +8,9 @@ import { modoLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
 import { jugarSiguienteJornada } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
+import { ErrorCantera, liberarJuvenil, subirJuvenil } from "@/servidor/cantera";
+import { ErrorObra, iniciarObra } from "@/servidor/instalaciones";
+import type { EdificioObra } from "@/dominio/reglas";
 import { aceptarOferta, contraofertar, ErrorPatrocinio, rechazarOferta } from "@/servidor/patrocinio";
 import { ErrorPlanteamiento, guardarEntrenamiento, guardarPlanteamiento } from "@/servidor/plantilla";
 import { ErrorTemporada, nuevaTemporada } from "@/servidor/temporada";
@@ -141,6 +144,36 @@ export async function responderOferta(formulario: FormData): Promise<void> {
     }
   } catch (e) {
     if (e instanceof ErrorPatrocinio) volver(ruta, { error: e.message });
+    throw e;
+  }
+}
+
+export async function mejorarEdificio(formulario: FormData): Promise<void> {
+  const club = await miClub();
+  const tipo = String(formulario.get("edificio")) as EdificioObra;
+  try {
+    await iniciarObra(club, tipo);
+    volver("/club/instalaciones", { ok: "Obra en marcha. Terminará en cuanto se dispute la próxima jornada." });
+  } catch (e) {
+    if (e instanceof ErrorObra) volver("/club/instalaciones", { error: e.message });
+    throw e;
+  }
+}
+
+/** Cantera: dar contrato profesional a un juvenil o despedirlo de la academia. */
+export async function decidirJuvenil(formulario: FormData): Promise<void> {
+  const club = await miClub();
+  const id = String(formulario.get("juvenil"));
+  const ruta = "/equipo/cantera";
+  try {
+    if (formulario.get("accion") === "liberar") {
+      await liberarJuvenil(club, id);
+      volver(ruta, { ok: "El juvenil deja la academia." });
+    }
+    const nombre = await subirJuvenil(club, id);
+    volver(ruta, { ok: `${nombre} firma su primer contrato profesional. ¡Uno de la casa!` });
+  } catch (e) {
+    if (e instanceof ErrorCantera) volver(ruta, { error: e.message });
     throw e;
   }
 }

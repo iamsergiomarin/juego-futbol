@@ -52,7 +52,7 @@ export default async function Patrocinio({ searchParams }: { searchParams: Promi
                   <p className="mt-1 text-xs text-suave">{EFECTO[contrato.perfil]}</p>
                   <p className="mt-3 text-xs text-suave">Satisfacción del patrocinador</p>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-fondo">
-                    <div className={`h-full ${contrato.satisfaccion >= PATROCINIO.satisfaccionRenueva ? "bg-cesped" : "bg-rival"}`} style={{ width: `${contrato.satisfaccion}%` }} />
+                    <div className={`h-full ${contrato.satisfaccion >= PATROCINIO.satisfaccionRenueva ? "bg-cesped" : contrato.satisfaccion > PATROCINIO.satisfaccionSeMarcha ? "bg-suave" : "bg-rival"}`} style={{ width: `${contrato.satisfaccion}%` }} />
                   </div>
                 </div>
               ) : lista.length === 0 ? (

@@ -12,12 +12,14 @@ import {
 } from "@/dominio/entrenamiento";
 import { nombreAtributo } from "@/dominio/atributos";
 import { valorJugador } from "@/dominio/mercado";
-import { ECONOMIA_JORNADA as E, LIGA, division, type NivelDivision } from "@/dominio/reglas";
+import { ECONOMIA_JORNADA as E, LIGA, OBRAS_EDIFICIOS, division, type NivelDivision } from "@/dominio/reglas";
 import { bdLocal } from "./bd";
 import { factorTaquilla } from "@/dominio/grada";
 import { publicarJornada, publicarPrevias, type LesionPartido } from "./grada";
 import { actividadMercadoJornada } from "./mercado";
 import { pagarPatrocinios } from "./patrocinio";
+import { desarrollarJuveniles, generarHornadas } from "./cantera";
+import { terminarObras } from "./instalaciones";
 import { publicarNoticia } from "./noticias";
 import { equipoParaPartido, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
 import { avanzarPlayoff, crearPlayoff } from "./temporada";
@@ -247,8 +249,9 @@ async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number
   const { dias, diasHastaPartido } = despuesDeJornada(jornada);
   const inicioSemana = dias.includes("martes");
   const clubes = (
-    await tx.query<{ id: string; humano: boolean; ciudad: number }>(
+    await tx.query<{ id: string; humano: boolean; ciudad: number; medico: number }>(
       `select c.id, c.manager_id is not null as humano,
+              coalesce((select e.nivel from edificios e where e.club_id = c.id and e.tipo = 'centro_medico'), 0)::int as medico,
               coalesce((select e.nivel from edificios e where e.club_id = c.id and e.tipo = 'ciudad_deportiva'), 1)::int as ciudad
          from clubes c join grupos g on g.id = c.grupo_id where g.abierto`,
     )
@@ -279,6 +282,8 @@ async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number
       // La baja se descuenta por jornada disputada (salvo si la lesión es de este mismo partido).
       if (jornadasLesion > 0 && !lesionadosEnPartido.has(j.id)) {
         jornadasLesion -= 1;
+        // Un buen centro médico recorta a veces una jornada más de baja.
+        if (jornadasLesion > 0 && rng() < club.medico * OBRAS_EDIFICIOS.recuperacionPorNivelMedico) jornadasLesion -= 1;
         if (jornadasLesion === 0) {
           tipoLesion = null;
           altas.push(j);
@@ -384,6 +389,9 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
     for (const p of partidos) for (const id of await jugarPartido(tx, t, siguiente, p, lesionesPartido)) lesionados.add(id);
     // La grada reacciona a los resultados (antes de que el calendario avance al playoff).
     await publicarJornada(tx, siguiente, partidos, lesionesPartido);
+    // Las obras que ya han cumplido su plazo se inauguran; a mitad de curso, Día de la Cantera.
+    await terminarObras(tx);
+    if (partidos.some((p) => p.competicion === "liga") && siguiente === LIGA.jornadas / 2) await generarHornadas(tx, "mitad");
 
     // Cierre de semana de liga (jornada del sábado): salarios, televisión y patrocinio.
     const deLiga = partidos.some((p) => p.competicion === "liga");
@@ -404,6 +412,7 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
         await movimiento(tx, c.id, t.id, siguiente, "Derechos de televisión", (presupuesto * E.televisionFija) / semanas);
       }
       await pagarPatrocinios(tx, t, siguiente, clubes, semanas, E.patrocinioBase);
+      await desarrollarJuveniles(tx);
     }
 
     const rng = crearRng(Math.floor(partidos[0]?.semilla ?? 1) + 7);

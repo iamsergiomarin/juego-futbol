@@ -5,5 +5,5 @@ export const PESTANAS_EQUIPO: Pestana[] = [
   { href: "/equipo/alineacion", etiqueta: "Alineación y táctica" },
   { href: "/equipo/entrenamiento", etiqueta: "Entrenamiento" },
   { href: "/equipo/mercado", etiqueta: "Mercado" },
-  { href: "/equipo/cantera", etiqueta: "Cantera", proximamente: true },
+  { href: "/equipo/cantera", etiqueta: "Cantera" },
 ];

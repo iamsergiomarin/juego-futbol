@@ -38,6 +38,8 @@ describe("Patrocinio en una partida local", () => {
     const quedan = await m.p.ofertasPendientes(clubId);
     expect(quedan.some((x) => x.espacio === "frontal")).toBe(false);
     await expect(m.p.aceptarOferta(clubId, o.id)).rejects.toThrow();
+    // Una marca no patrocina dos espacios.
+    expect(quedan.some((x) => x.marca === o.marca)).toBe(false);
   });
 
   it("la contraoferta solo se puede hacer una vez", async () => {

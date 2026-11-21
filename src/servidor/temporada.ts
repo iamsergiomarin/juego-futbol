@@ -8,6 +8,7 @@ import { asegurarCalendario, movimiento } from "./liga";
 import { generarAgentesLibres, insertarClubBot, isoFecha, nombresUsados, proximoLunes } from "./mundo";
 import { publicarEvento } from "./grada";
 import { liquidarPatrocinios } from "./patrocinio";
+import { generarHornadaClub, liberarMayores } from "./cantera";
 import { publicarNoticia } from "./noticias";
 
 /** Prima de ascenso: fracción del presupuesto de la nueva división. */
@@ -302,6 +303,9 @@ export async function nuevaTemporada(clubId: string): Promise<number> {
     for (const id of (await tx.query<{ id: string }>("select id from clubes where grupo_id = $1", [grupoActivo])).rows.map((r) => r.id)) {
       await tx.query("insert into clasificacion (temporada_id, grupo_id, club_id) values ($1, $2, $3) on conflict do nothing", [nueva, grupoActivo, id]);
     }
+    // Cantera: los juveniles que cumplen la edad de salida sin contrato se marchan y llega la hornada de pretemporada.
+    await liberarMayores(tx, clubId);
+    await generarHornadaClub(tx, clubId, "pretemporada");
 
     // Jugadores: retiradas, declive de veteranos, contratos y estado físico a cero.
     const jugadores = (

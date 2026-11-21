@@ -37,7 +37,7 @@ async function esHumano(bd: Consulta, clubId: string): Promise<boolean> {
 }
 
 /** El "ahora" del juego: la fecha del último partido jugado (o el inicio de la temporada). */
-async function fechaJuego(bd: Consulta): Promise<string> {
+export async function fechaJuego(bd: Consulta): Promise<string> {
   const { rows } = await bd.query<{ f: string }>(
     `select to_char(coalesce(
         (select max(inicio) from partidos where temporada_id = (select id from temporadas where actual) and estado = 'finalizado'),

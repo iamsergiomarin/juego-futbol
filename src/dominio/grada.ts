@@ -458,6 +458,9 @@ export type EventoClub =
   | { tipo: "ascenso"; club: string; division: string; siguiente: string }
   | { tipo: "eliminado"; club: string; ronda: string | null }
   | { tipo: "nueva_temporada"; club: string; numero: number; division: string }
+  | { tipo: "obra"; club: string; edificio: string; nivel: number }
+  | { tipo: "cantera"; club: string; cantidad: number; joya: string | null; momento: "pretemporada" | "mitad" | "inauguracion" }
+  | { tipo: "canterano"; club: string; jugador: string; media: number; edad: number; joya: boolean }
   | { tipo: "patrocinio"; club: string; marca: string; espacio: string; perfil: "local" | "multinacional" | "apuestas"; temporadas: number; importe: number };
 
 export interface ReaccionEvento {
@@ -590,6 +593,35 @@ export function reaccionesEvento(ev: EventoClub, voces: Voz[], rng: Rng): Reacci
       b.poner(pena, ["Orgullosos igualmente. El año que viene, otra vez."], 0.8, "neutro");
       b.poner(optimista, ["Duele, pero estamos más cerca que nunca. Vamos a por la próxima."], 0.6, "neutro");
       animo = -6;
+      break;
+    }
+    case "obra": {
+      Object.assign(vars, { edificio: ev.edificio.toLowerCase(), nivel: ev.nivel });
+      b.poner(oficial, ["🏗️ OBRAS TERMINADAS | {club} estrena {edificio} (nivel {nivel}). El club sigue creciendo."], 1, "positivo");
+      b.poner(cronista, ["{club} culmina las obras de {edificio}: una inversión a largo plazo para el proyecto."], 0.7, "neutro");
+      b.poner(optimista, ["¡Se nota que el club crece! Da gusto ver las obras acabadas."], 0.5, "positivo");
+      b.poner(pesimista, ["Mucho ladrillo… a ver si se nota en el campo."], 0.4, "neutro");
+      animo = 3;
+      break;
+    }
+    case "cantera": {
+      Object.assign(vars, { cantidad: ev.cantidad, joya: ev.joya ?? "" });
+      const titulo = ev.momento === "inauguracion" ? "INAUGURACIÓN DE LA CANTERA" : "DÍA DE LA CANTERA";
+      b.poner(oficial, [`🌱 ${titulo} | {club} presenta a ${ev.cantidad} nuevos juveniles. ¡El futuro es de la casa!`], 1, "positivo");
+      b.poner(cronista, ["{club} estrena hornada: {cantidad} chavales llegan a la academia en busca de un hueco en el primer equipo."], 0.8, "neutro");
+      if (ev.joya) b.poner(radio, ["Dicen en los despachos que {joya} es de lo mejor que ha pasado por la casa en años. Habrá que seguirle."], 1, "positivo");
+      b.poner(pena, ["Los chavales de la cantera, siempre con la peña. Nos vemos en el campo de entrenamiento."], 0.6, "positivo");
+      b.poner(optimista, ["Cantera, cantera y cantera. Ese es el camino."], 0.5, "positivo");
+      animo = ev.joya ? 3 : 1;
+      break;
+    }
+    case "canterano": {
+      Object.assign(vars, { jugador: ev.jugador, media: coma(ev.media), edad: ev.edad });
+      b.poner(oficial, ["🧒 DE LA CASA | {jugador} ({edad} años) firma su primer contrato profesional con {club}."], 1, "positivo");
+      b.poner(cronista, ["{jugador}, {edad} años, da el salto de la academia al primer equipo de {club}."], 0.9, "positivo");
+      b.poner(pena, ["¡Uno de los nuestros! Aquí se ha criado. La peña le aplaudirá siempre."], 0.8, "positivo");
+      b.poner(optimista, ["Un chaval de casa. Eso es sentir el escudo."], 0.6, "positivo");
+      animo = ev.joya ? 4 : 2;
       break;
     }
     case "patrocinio": {

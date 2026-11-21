@@ -444,3 +444,56 @@ export async function jornadasPendientes(): Promise<number> {
   );
   return rows[0].n;
 }
+
+export interface Goleador {
+  jugador: string;
+  club: string;
+  propio: boolean;
+  goles: number;
+  partidos: number;
+}
+
+/** Máximos goleadores de la liga del grupo del club en la temporada actual (a partir de los eventos de los partidos). */
+export async function goleadoresGrupo(clubId: string, limite = 15): Promise<Goleador[]> {
+  const bd = await bdLocal();
+  return (
+    await bd.query<Goleador>(
+      `with grupo as (select grupo_id from clubes where id = $1),
+            goles as (
+              select (e->>'jugadorId')::uuid as jugador_id, p.id as partido
+                from partidos p, jsonb_array_elements(p.eventos) e
+               where p.temporada_id = (select id from temporadas where actual) and p.competicion = 'liga'
+                 and p.grupo_id = (select grupo_id from grupo) and p.estado = 'finalizado' and e->>'tipo' = 'gol' and e->>'jugadorId' is not null)
+       select j.nombre || ' ' || j.apellido as jugador, c.nombre as club, c.id = $1 as propio, count(*)::int as goles, count(distinct g.partido)::int as partidos
+         from goles g join jugadores j on j.id = g.jugador_id left join clubes c on c.id = j.club_id
+        group by j.id, j.nombre, j.apellido, c.nombre, c.id
+        order by goles desc, partidos asc, jugador limit $2`,
+      [clubId, limite],
+    )
+  ).rows;
+}
+
+export interface EquipoEstadistica {
+  club: string;
+  propio: boolean;
+  jugados: number;
+  golesFavor: number;
+  golesContra: number;
+  porteriaCero: number;
+}
+
+export async function equiposGrupo(clubId: string): Promise<EquipoEstadistica[]> {
+  const bd = await bdLocal();
+  return (
+    await bd.query<EquipoEstadistica>(
+      `select c.nombre as club, c.id = $1 as propio, cl.jugados, cl.goles_favor as "golesFavor", cl.goles_contra as "golesContra",
+              (select count(*)::int from partidos p
+                where p.temporada_id = cl.temporada_id and p.competicion = 'liga' and p.estado = 'finalizado'
+                  and ((p.local_id = c.id and p.goles_visitante = 0) or (p.visitante_id = c.id and p.goles_local = 0))) as "porteriaCero"
+         from clasificacion cl join clubes c on c.id = cl.club_id
+        where cl.temporada_id = (select id from temporadas where actual) and cl.grupo_id = (select grupo_id from clubes where id = $1)
+        order by c.nombre`,
+      [clubId],
+    )
+  ).rows;
+}
