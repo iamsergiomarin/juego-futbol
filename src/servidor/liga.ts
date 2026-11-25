@@ -20,6 +20,7 @@ import { actividadMercadoJornada } from "./mercado";
 import { pagarPatrocinios } from "./patrocinio";
 import { desarrollarJuveniles, generarHornadas } from "./cantera";
 import { terminarObras } from "./instalaciones";
+import { crearCalendarioFilial, jugarFilial } from "./filial";
 import { publicarNoticia } from "./noticias";
 import { equipoParaPartido, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
 import { avanzarPlayoff, crearPlayoff } from "./temporada";
@@ -59,6 +60,7 @@ export async function asegurarCalendario(): Promise<void> {
         valores,
       );
     }
+    await crearCalendarioFilial(tx);
   });
 }
 
@@ -191,6 +193,10 @@ async function jugarPartido(tx: Transaction, t: { id: number }, jornada: number,
   const goleadores = new Map<string, number>();
   for (const e of r.eventos) if (e.tipo === "gol" && e.jugadorId) goleadores.set(e.jugadorId, (goleadores.get(e.jugadorId) ?? 0) + 1);
   const participantes = new Set(r.participantes);
+  // Los jugadores con ficha de filial cuentan sus partidos arriba: al décimo piden ficha.
+  if (r.participantes.length > 0) {
+    await tx.query("update jugadores set partidos_primer_equipo_temporada = partidos_primer_equipo_temporada + 1 where id = any($1::uuid[]) and ficha = 'filial'", [r.participantes]);
+  }
   const lesionados = new Set<string>();
   const cambios: CambioJugador[] = [];
   for (const [i, clubId] of [p.local, p.visitante].entries()) {
@@ -413,6 +419,8 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
       }
       await pagarPatrocinios(tx, t, siguiente, clubes, semanas, E.patrocinioBase);
       await desarrollarJuveniles(tx);
+      // Domingo: liga de filiales (una vuelta, 19 jornadas).
+      await jugarFilial(tx, siguiente / 2);
     }
 
     const rng = crearRng(Math.floor(partidos[0]?.semilla ?? 1) + 7);

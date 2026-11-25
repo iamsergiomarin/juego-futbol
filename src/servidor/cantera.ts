@@ -2,7 +2,7 @@
 import type { Transaction } from "@electric-sql/pglite";
 import { crearRng, semillaAleatoria } from "@/motor";
 import { desarrollarJuvenil, estaListo, generarHornada } from "@/dominio/cantera";
-import { CANTERA_JUEGO, type NivelDivision } from "@/dominio/reglas";
+import { CANTERA_JUEGO, FILIAL, type NivelDivision } from "@/dominio/reglas";
 import { MERCADO_LOCAL, salarioReferencia, valorJugador } from "@/dominio/mercado";
 import { bdLocal } from "./bd";
 import { publicarEvento } from "./grada";
@@ -131,27 +131,33 @@ export async function juvenilesDelClub(clubId: string): Promise<{ juveniles: Juv
 }
 
 /** Contrato profesional: el juvenil pasa al primer equipo con su club como formador. */
-export async function subirJuvenil(clubId: string, juvenilId: string): Promise<string> {
+export async function subirJuvenil(clubId: string, juvenilId: string, sinFicha = false): Promise<string> {
   const bd = await bdLocal();
   return bd.transaction(async (tx) => {
     const j = (
-      await tx.query<{ nombre: string; apellido: string; posicion: string; atributos: Record<string, number>; media: number; potencial: number; personalidad: string; joya: boolean; nacimiento: string; edad: number }>(
+      await tx.query<{ nombre: string; apellido: string; posicion: string; atributos: Record<string, number>; media: number; potencial: number; personalidad: string; joya: boolean; nacimiento: string; edad: number; estado: string }>(
         `select nombre, apellido, posicion, atributos, media::float8 as media, potencial, personalidad, joya, fecha_nacimiento::text as nacimiento,
-                date_part('year', age((select inicio from temporadas where actual), fecha_nacimiento))::int as edad
-           from juveniles where id = $1 and club_id = $2 and estado = 'academia' for update`,
+                date_part('year', age((select inicio from temporadas where actual), fecha_nacimiento))::int as edad, estado
+           from juveniles where id = $1 and club_id = $2 and estado in ('academia', 'filial') for update`,
         [juvenilId, clubId],
       )
     ).rows[0];
     if (!j) throw new ErrorCantera("Ese juvenil ya no está en la academia.");
+    if (sinFicha) {
+      if (j.estado !== "filial") throw new ErrorCantera("Solo los jugadores del filial suben sin ficha.");
+      if (j.edad >= FILIAL.edadSinFicha) throw new ErrorCantera(`Con ${FILIAL.edadSinFicha} años o más necesita ficha del primer equipo.`);
+      const arriba = (await tx.query<{ n: number }>("select count(*)::int as n from jugadores where club_id = $1 and ficha = 'filial' and not retirado", [clubId])).rows[0].n;
+      if (arriba >= FILIAL.maximoSinFicha) throw new ErrorCantera(`Ya hay ${FILIAL.maximoSinFicha} jugadores del filial jugando arriba sin ficha.`);
+    }
     const plantilla = (await tx.query<{ n: number }>("select count(*)::int as n from jugadores where club_id = $1 and ficha = 'primer_equipo' and not retirado", [clubId])).rows[0].n;
-    if (plantilla >= MERCADO_LOCAL.maximoPlantilla) throw new ErrorCantera(`La plantilla está completa (${MERCADO_LOCAL.maximoPlantilla} fichas).`);
+    if (!sinFicha && plantilla >= MERCADO_LOCAL.maximoPlantilla) throw new ErrorCantera(`La plantilla está completa (${MERCADO_LOCAL.maximoPlantilla} fichas).`);
     const c = (await tx.query<{ numero: number; division: NivelDivision }>("select t.numero, g.division from temporadas t, clubes c join grupos g on g.id = c.grupo_id where t.actual and c.id = $1", [clubId])).rows[0];
     const atributos = Object.fromEntries(Object.entries(j.atributos).map(([k, v]) => [k, Math.max(1, Math.min(100, Math.round(v)))]));
     const dorsal = (await tx.query<{ d: number }>("select min(n)::int as d from generate_series(2, 99) n where n <> 13 and not exists (select 1 from jugadores where club_id = $1 and dorsal = n)", [clubId])).rows[0].d;
     await tx.query(
       `insert into jugadores (club_id, nombre, apellido, fecha_nacimiento, posicion, atributos, media, potencial, personalidad, ficha, contrato_hasta, salario, valor_mercado, dorsal, club_formador)
-       values ($1, $2, $3, $4, $5::posicion, $6::jsonb, $7, $8, $9::personalidad, 'primer_equipo', $10, $11, $12, $13, $1)`,
-      [clubId, j.nombre, j.apellido, j.nacimiento, j.posicion, JSON.stringify(atributos), j.media, j.potencial, j.personalidad, c.numero + 2, salarioReferencia(j.media, c.division), valorJugador(j.media, j.edad), dorsal],
+       values ($1, $2, $3, $4, $5::posicion, $6::jsonb, $7, $8, $9::personalidad, $14::tipo_ficha, $10, $11, $12, $13, $1)`,
+      [clubId, j.nombre, j.apellido, j.nacimiento, j.posicion, JSON.stringify(atributos), j.media, j.potencial, j.personalidad, c.numero + 2, salarioReferencia(j.media, c.division), valorJugador(j.media, j.edad), dorsal, sinFicha ? "filial" : "primer_equipo"],
     );
     await tx.query("update juveniles set estado = 'subido' where id = $1", [juvenilId]);
     await tx.query("update clubes set popularidad = least(100, popularidad + 1) where id = $1", [clubId]);

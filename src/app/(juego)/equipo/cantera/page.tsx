@@ -2,7 +2,7 @@ import { COLOR_POSICION, formatoMedia } from "@/componentes/formato";
 import { Aviso } from "@/componentes/juego/Aviso";
 import { Dato } from "@/componentes/juego/Caja";
 import { Pestanas } from "@/componentes/juego/Pestanas";
-import { CANTERA } from "@/dominio/reglas";
+import { CANTERA, FILIAL } from "@/dominio/reglas";
 import { MERCADO_LOCAL } from "@/dominio/mercado";
 import { managerLocal } from "@/servidor/consultas";
 import { juvenilesDelClub } from "@/servidor/cantera";
@@ -69,6 +69,11 @@ export default async function Cantera({ searchParams }: { searchParams: Promise<
                     <button name="accion" value="subir" className="rounded-full bg-cesped px-4 py-1.5 text-sm font-semibold text-white dark:text-black">
                       Dar contrato
                     </button>
+                    {j.edad >= FILIAL.edadMinima ? (
+                      <button name="accion" value="filial" className="rounded-full border border-borde px-4 py-1.5 text-sm font-semibold">
+                        Al filial
+                      </button>
+                    ) : null}
                     <button name="accion" value="liberar" className="rounded-full px-4 py-1.5 text-sm text-suave hover:underline">
                       Despedir
                     </button>

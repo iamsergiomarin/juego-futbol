@@ -240,3 +240,25 @@ export const CANTERA_JUEGO = {
   /** Diferencia de media con la plantilla por debajo de la cual un juvenil "está listo". */
   margenListo: 0.8,
 } as const;
+
+/** Filial: liga de una vuelta entre los filiales del grupo (domingos) y reglas de fichas. */
+export const FILIAL = {
+  jornadas: 19,
+  /** Nivel mínimo de la escuela de cantera para tener filial propio (con menos, lo lleva el club sin que el mánager intervenga). */
+  nivelEscuelaMinimo: 1,
+  edadMinima: 16,
+  /** Plantilla máxima del filial; si faltan jugadores el club completa con jóvenes de la zona. */
+  maximoPlantilla: 22,
+  /** Menores de esta edad suben al primer equipo sin ocupar ficha. */
+  edadSinFicha: 22,
+  /** Máximo de jugadores del filial jugando arriba sin ficha a la vez. */
+  maximoSinFicha: 5,
+  /** Con tantos partidos en el primer equipo, el jugador pide ficha. */
+  partidosParaFicha: 10,
+  /** Nivel de los jóvenes de relleno respecto a la media del club. */
+  descuentoRelleno: 2,
+  /** Un bot lleva un filial por debajo de la media de su primer equipo. */
+  descuentoBot: 1.3,
+  /** El juvenil que juega con el filial se desarrolla más deprisa: pasos extra por partido. */
+  pasosPorPartido: 1,
+} as const;

@@ -507,15 +507,18 @@ export interface Pendiente {
 export async function pendientesDelClub(clubId: string): Promise<Pendiente[]> {
   const bd = await bdLocal();
   const una = async (sql: string) => (await bd.query<{ n: number }>(sql, [clubId])).rows[0].n;
-  const [ofertas, saleNadie, obras] = await Promise.all([
+  const [ofertas, saleNadie, obras, piden] = await Promise.all([
     una("select count(*)::int as n from ofertas_patrocinio o join temporadas t on t.id = o.temporada_id where o.club_id = $1 and t.actual and o.estado = 'pendiente'"),
     una(`select count(*)::int as n from juveniles where club_id = $1 and estado = 'academia'
            and date_part('year', age((select inicio from temporadas where actual), fecha_nacimiento)) + 1 >= 19`),
     una("select count(*)::int as n from obras where club_id = $1 and estado = 'en_curso'"),
+    una(`select count(*)::int as n from jugadores where club_id = $1 and ficha = 'filial' and not retirado
+           and (partidos_primer_equipo_temporada >= 10 or date_part('year', age((select inicio from temporadas where actual), fecha_nacimiento)) >= 22)`),
   ]);
   const lista: Pendiente[] = [];
   if (ofertas > 0) lista.push({ texto: `${ofertas} ${ofertas === 1 ? "oferta de patrocinio espera" : "ofertas de patrocinio esperan"} respuesta.`, enlace: "/club/patrocinio" });
   if (saleNadie > 0) lista.push({ texto: `${saleNadie} ${saleNadie === 1 ? "juvenil cumple" : "juveniles cumplen"} la edad de salida: o contrato, o se van.`, enlace: "/equipo/cantera" });
   if (obras > 0) lista.push({ texto: `${obras} ${obras === 1 ? "obra se inaugura" : "obras se inauguran"} tras la próxima jornada.`, enlace: "/club/instalaciones" });
+  if (piden > 0) lista.push({ texto: `${piden} ${piden === 1 ? "jugador del filial pide" : "jugadores del filial piden"} ficha del primer equipo.`, enlace: "/equipo/filial" });
   return lista;
 }

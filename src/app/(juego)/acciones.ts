@@ -9,6 +9,7 @@ import { managerLocal } from "@/servidor/consultas";
 import { jugarSiguienteJornada } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
 import { ErrorGrada, publicarComunicado } from "@/servidor/grada";
+import { darFicha, ErrorFilial, pasarAlFilial, volverALaAcademia } from "@/servidor/filial";
 import { ErrorCantera, liberarJuvenil, subirJuvenil } from "@/servidor/cantera";
 import { ErrorObra, iniciarObra } from "@/servidor/instalaciones";
 import type { EdificioObra } from "@/dominio/reglas";
@@ -165,16 +166,20 @@ export async function mejorarEdificio(formulario: FormData): Promise<void> {
 export async function decidirJuvenil(formulario: FormData): Promise<void> {
   const club = await miClub();
   const id = String(formulario.get("juvenil"));
-  const ruta = "/equipo/cantera";
+  const ruta = formulario.get("volver") === "filial" ? "/equipo/filial" : "/equipo/cantera";
   try {
     if (formulario.get("accion") === "liberar") {
       await liberarJuvenil(club, id);
       volver(ruta, { ok: "El juvenil deja la academia." });
     }
-    const nombre = await subirJuvenil(club, id);
+    if (formulario.get("accion") === "filial") {
+      await pasarAlFilial(club, id);
+      volver(ruta, { ok: "El juvenil pasa al filial. Jugará la liga de los domingos." });
+    }
+    const nombre = await subirJuvenil(club, id, formulario.get("accion") === "sin_ficha");
     volver(ruta, { ok: `${nombre} firma su primer contrato profesional. ¡Uno de la casa!` });
   } catch (e) {
-    if (e instanceof ErrorCantera) volver(ruta, { error: e.message });
+    if (e instanceof ErrorCantera || e instanceof ErrorFilial) volver(ruta, { error: e.message });
     throw e;
   }
 }
@@ -187,6 +192,24 @@ export async function publicarComoClub(formulario: FormData): Promise<void> {
     volver("/grada", { ok: "Comunicado publicado. La grada ya está contestando." });
   } catch (e) {
     if (e instanceof ErrorGrada) volver("/grada", { error: e.message });
+    throw e;
+  }
+}
+
+/** Filial: devolver a la academia o dar ficha a quien juega arriba sin ella. */
+export async function gestionarFilial(formulario: FormData): Promise<void> {
+  const club = await miClub();
+  const id = String(formulario.get("id"));
+  const ruta = "/equipo/filial";
+  try {
+    if (formulario.get("accion") === "ficha") {
+      const nombre = await darFicha(club, id);
+      volver(ruta, { ok: `${nombre} ya tiene ficha del primer equipo.` });
+    }
+    await volverALaAcademia(club, id);
+    volver(ruta, { ok: "El jugador vuelve a la academia." });
+  } catch (e) {
+    if (e instanceof ErrorFilial) volver(ruta, { error: e.message });
     throw e;
   }
 }
