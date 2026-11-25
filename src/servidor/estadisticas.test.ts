@@ -35,3 +35,17 @@ describe("Estadísticas de la competición", () => {
     expect(e.filter((x) => x.propio)).toHaveLength(1);
   });
 });
+
+describe("Pendiente en el club", () => {
+  it("avisa de las ofertas de patrocinio sin responder", async () => {
+    const c = await import("./consultas");
+    const p = await import("./patrocinio");
+    const mundo = await import("./mundo");
+    void mundo;
+    const bd = await (await import("./bd")).bdLocal();
+    const club = (await bd.query<{ id: string }>("select id from clubes where manager_id is not null")).rows[0].id;
+    await p.ofertasPendientes(club);
+    const lista = await c.pendientesDelClub(club);
+    expect(lista.some((x) => x.enlace === "/club/patrocinio")).toBe(true);
+  });
+});

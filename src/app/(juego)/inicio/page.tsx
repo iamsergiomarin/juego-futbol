@@ -10,6 +10,7 @@ import { BarraAnimo, Publicacion } from "@/componentes/juego/Publicacion";
 import { PartidosDelClub } from "@/componentes/juego/Partidos";
 import { bdLocal, modoLocal } from "@/servidor/bd";
 import {
+  pendientesDelClub,
   cabeceraClub,
   clasificacion,
   estadoTemporada,
@@ -38,7 +39,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const manager = (await managerLocal())!;
   const club = (await cabeceraClub(manager.clubId))!;
   const bd = await bdLocal();
-  const [temporada, tabla, jugados, pendientes, economia, noticias, resumen, jugadores, grada, ultimasGrada] = await Promise.all([
+  const [temporada, tabla, jugados, pendientes, economia, noticias, resumen, jugadores, grada, ultimasGrada, porHacer] = await Promise.all([
     estadoTemporada(),
     clasificacion(club.grupoId),
     partidosClub(club.id, "jugados", 5),
@@ -49,6 +50,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     jugadoresEstado(bd, club.id),
     estadoGrada(bd, club.id),
     lineaDeTiempo(bd, club.id, "todo", 4),
+    pendientesDelClub(club.id),
   ]);
   const planteamiento = await planteamientoClub(bd, club.id, jugadores);
   const [proximo, ...siguientes] = pendientes;
@@ -220,6 +222,20 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
         >
           <TablaClasificacion filas={tabla} propio={club.id} compacta conDescenso={club.division !== "Quinta"} />
         </Caja>
+
+        {porHacer.length > 0 ? (
+          <Caja titulo="Pendiente en el club" className="lg:col-span-12">
+            <ul className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              {porHacer.map((p) => (
+                <li key={p.enlace}>
+                  <Link href={p.enlace} className="block rounded-xl border border-borde px-4 py-3 hover:border-cesped">
+                    {p.texto}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Caja>
+        ) : null}
 
         {/* Novedades */}
         <Caja titulo="Novedades del cuerpo técnico" className="lg:col-span-5">
