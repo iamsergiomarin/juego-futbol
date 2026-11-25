@@ -21,13 +21,13 @@ export function Navegacion({
 }) {
   const ruta = usePathname();
   return (
-    <header className="sticky top-0 z-20 border-b border-borde bg-superficie/95 backdrop-blur">
+    <header className="franjas sticky top-0 z-20 border-b-4 border-tiza/80 text-tiza">
       <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Link href="/inicio" className="flex min-w-0 shrink-0 items-center gap-2.5">
           <Escudo principal={club.colorPrincipal} secundario={club.colorSecundario} texto={club.corto} tamano={30} />
           <span className="hidden min-w-0 leading-tight md:block">
-            <span className="block truncate text-sm font-semibold">{club.nombre}</span>
-            <span className="block text-xs text-suave">
+            <span className="titulo block truncate text-xl font-bold">{club.nombre}</span>
+            <span className="block text-xs text-tiza/70">
               {club.division} · Grupo {club.grupo}
             </span>
           </span>
@@ -42,8 +42,8 @@ export function Navegacion({
                 href={s.href}
                 aria-current={activa ? "page" : undefined}
                 className={
-                  "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors " +
-                  (activa ? "bg-cesped text-white dark:text-black" : "text-suave hover:bg-fondo hover:text-texto")
+                  "titulo shrink-0 rounded-md px-3.5 py-1 text-lg font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-tiza " +
+                  (activa ? "bg-tiza text-noche" : "text-tiza/80 hover:bg-white/10 hover:text-tiza")
                 }
               >
                 {s.etiqueta}
@@ -53,8 +53,8 @@ export function Navegacion({
         </nav>
 
         {temporada ? (
-          <div className="hidden shrink-0 text-right text-xs leading-tight text-suave lg:block">
-            <span className="block font-semibold text-texto">Temporada {temporada.numero}</span>
+          <div className="hidden shrink-0 text-right text-xs leading-tight text-tiza/70 lg:block">
+            <span className="titulo block text-lg font-semibold text-tiza">Temporada {temporada.numero}</span>
             Jornada {Math.min(temporada.jugadas + 1, temporada.total)} de {temporada.total}
           </div>
         ) : null}

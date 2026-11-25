@@ -63,11 +63,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       <Aviso ok={q.ok} error={q.error} />
       <div className="grid gap-5 lg:grid-cols-12">
         {/* Próximo partido o cierre de temporada */}
-        <section className="rounded-2xl border border-borde bg-superficie p-5 sm:p-6 lg:col-span-8">
+        <section className="franjas hero rounded-2xl p-5 text-tiza sm:p-6 lg:col-span-8">
           {proximo ? (
             <>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-xs font-semibold tracking-widest text-suave uppercase">
+                <p className="titulo text-2xl font-semibold">
                   Próximo partido · {proximo.competicion === "playoff" ? `Playoff de ascenso · ${proximo.ronda}` : `Jornada ${proximo.jornada} de ${temporada?.total}`}
                 </p>
                 <p className="text-sm text-suave first-letter:uppercase">{formatoFechaHora(proximo.inicio)}</p>
@@ -77,11 +77,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                   eq ? (
                     <div key={eq.id} className="flex flex-col items-center gap-2 text-center">
                       <Escudo principal={eq.colorPrincipal} secundario={eq.colorSecundario} texto={eq.corto} tamano={64} titulo={eq.nombre} />
-                      <span className={`leading-tight ${eq.id === club.id ? "font-bold" : "font-semibold"}`}>{eq.nombre}</span>
+                      <span className={`titulo text-2xl leading-tight ${eq.id === club.id ? "font-bold" : "font-semibold"}`}>{eq.nombre}</span>
                       <span className="text-xs text-suave">{i === 0 ? "Local" : "Visitante"}</span>
                     </div>
                   ) : (
-                    <span key="vs" className="text-2xl font-bold text-suave">
+                    <span key="vs" className="titulo text-4xl font-bold text-suave">
                       vs
                     </span>
                   ),
@@ -132,7 +132,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             </>
           ) : resumen?.fase === "terminada" && resumen.desenlace ? (
             <div className="flex h-full flex-col justify-center gap-2 py-4 text-center">
-              <p className="text-xs font-semibold tracking-widest text-suave uppercase">
+              <p className="titulo text-xl font-semibold">
                 Temporada {resumen.numero} · {resumen.posicion}.º con {resumen.puntos} puntos
               </p>
               <p className="text-3xl font-bold">{NOMBRE_DESENLACE[resumen.desenlace][0]}</p>
@@ -158,7 +158,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             </div>
           ) : (
             <div className="flex h-full flex-col justify-center gap-3 py-6 text-center">
-              <p className="text-xs font-semibold tracking-widest text-suave uppercase">Playoff de ascenso</p>
+              <p className="titulo text-xl font-semibold">Playoff de ascenso</p>
               <p className="text-2xl font-bold">El playoff sigue sin nosotros</p>
               <ul className="mx-auto space-y-1 text-sm">
                 {resumen?.playoff.map((p) => (

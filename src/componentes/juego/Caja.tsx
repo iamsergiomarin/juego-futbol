@@ -17,9 +17,9 @@ export function Caja({
   sinRelleno?: boolean;
 }) {
   return (
-    <section className={`flex min-w-0 flex-col rounded-2xl border border-borde bg-superficie ${className}`}>
-      <div className="flex items-baseline justify-between gap-3 px-5 pt-4 pb-3">
-        <h2 className="font-semibold">{titulo}</h2>
+    <section className={`flex min-w-0 flex-col overflow-hidden rounded-2xl border border-borde bg-superficie ${className}`}>
+      <div className="flex items-baseline justify-between gap-3 border-t-4 border-cesped px-5 pt-3 pb-3">
+        <h2 className="titulo text-xl font-semibold">{titulo}</h2>
         {enlace ? (
           <Link href={enlace.href} className="text-sm font-semibold text-cesped hover:underline">
             {enlace.texto}
@@ -38,7 +38,7 @@ export function Dato({ etiqueta, valor, nota, tono }: { etiqueta: string; valor:
   return (
     <div className="rounded-2xl border border-borde bg-superficie p-4">
       <p className="text-xs text-suave">{etiqueta}</p>
-      <p className={`mt-1 text-xl font-bold tabular-nums ${color}`}>{valor}</p>
+      <p className={`titulo mt-1 text-3xl font-bold tabular-nums ${color}`}>{valor}</p>
       {nota ? <p className="mt-0.5 text-xs text-suave">{nota}</p> : null}
     </div>
   );

@@ -15,7 +15,7 @@ export function Pestanas({ titulo, pestanas }: { titulo: string; pestanas: Pesta
   const ruta = usePathname();
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-borde">
-      <h1 className="pb-3 text-2xl font-bold tracking-tight">{titulo}</h1>
+      <h1 className="titulo pb-2 text-4xl font-bold">{titulo}</h1>
       <nav aria-label={`Apartados de ${titulo}`} className="-mb-px flex gap-1 overflow-x-auto">
         {pestanas.map((p) => {
           const activa = ruta === p.href;
@@ -33,7 +33,7 @@ export function Pestanas({ titulo, pestanas }: { titulo: string; pestanas: Pesta
               href={p.href}
               aria-current={activa ? "page" : undefined}
               className={
-                "shrink-0 border-b-2 px-3 pb-3 text-sm font-semibold transition-colors " +
+                "titulo shrink-0 border-b-4 px-3 pb-2 text-lg font-semibold transition-colors " +
                 (activa ? "border-cesped text-texto" : "border-transparent text-suave hover:text-texto")
               }
             >

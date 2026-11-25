@@ -153,11 +153,12 @@ export async function responderOferta(formulario: FormData): Promise<void> {
 export async function mejorarEdificio(formulario: FormData): Promise<void> {
   const club = await miClub();
   const tipo = String(formulario.get("edificio")) as EdificioObra;
+  const origen = formulario.get("volver") === "/club/ciudad" ? "/club/ciudad" : "/club/instalaciones";
   try {
     await iniciarObra(club, tipo);
-    volver("/club/instalaciones", { ok: "Obra en marcha. Terminará en cuanto se dispute la próxima jornada." });
+    volver(origen, { ok: "Obra en marcha. Terminará en cuanto se dispute la próxima jornada." });
   } catch (e) {
-    if (e instanceof ErrorObra) volver("/club/instalaciones", { error: e.message });
+    if (e instanceof ErrorObra) volver(origen, { error: e.message });
     throw e;
   }
 }
