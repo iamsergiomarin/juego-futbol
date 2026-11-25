@@ -223,3 +223,21 @@ describe("ánimo de la grada", () => {
     expect(reacciones(rng, 1.2, 500, 60).meGusta).toBeGreaterThan(reacciones(rng, 0.3, 500, 60).meGusta);
   });
 });
+
+describe("comunicados del club", () => {
+  it("limpia espacios y rechaza vacíos o demasiado largos", async () => {
+    const { limpiarComunicado, LIMITE_COMUNICADO } = await import("./grada");
+    expect(limpiarComunicado("  Hola \n  afición  ")).toBe("Hola afición");
+    expect(limpiarComunicado("  ")).toBeNull();
+    expect(limpiarComunicado("x".repeat(LIMITE_COMUNICADO + 1))).toBeNull();
+  });
+
+  it("la grada contesta, con tono distinto según el ánimo, y respeta el texto tal cual", async () => {
+    const { reaccionesComunicado } = await import("./grada");
+    const alegre = reaccionesComunicado("Entradas a {club} 10 €", 80, voces, crearRng(1));
+    expect(alegre[0].texto).toBe("Entradas a {club} 10 €");
+    expect(alegre.length).toBeGreaterThan(1);
+    expect(alegre.slice(1).every((b) => b.respuestaA === 0 && b.tono === "positivo")).toBe(true);
+    expect(reaccionesComunicado("Hola", 20, voces, crearRng(1)).slice(1).every((b) => b.tono === "neutro")).toBe(true);
+  });
+});

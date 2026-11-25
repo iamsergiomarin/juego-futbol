@@ -4,6 +4,9 @@ import { Caja } from "@/componentes/juego/Caja";
 import { BarraAnimo, contar, Publicacion } from "@/componentes/juego/Publicacion";
 import { bdLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
+import { Aviso } from "@/componentes/juego/Aviso";
+import { LIMITE_COMUNICADO } from "@/dominio/grada";
+import { publicarComoClub } from "../acciones";
 import { estadoGrada, lineaDeTiempo, type FiltroGrada } from "@/servidor/grada";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +20,7 @@ const FILTROS: { id: FiltroGrada; etiqueta: string }[] = [
 
 const TIPO_VOZ: Record<string, string> = { club: "Cuenta oficial", pena: "Peña", aficion: "Aficionado", prensa: "Prensa local" };
 
-export default async function Grada({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+export default async function Grada({ searchParams }: { searchParams: Promise<{ ver?: string; ok?: string; error?: string }> }) {
   const q = await searchParams;
   const filtro = FILTROS.some((f) => f.id === q.ver) ? (q.ver as FiltroGrada) : "todo";
   const manager = (await managerLocal())!;
@@ -44,6 +47,18 @@ export default async function Grada({ searchParams }: { searchParams: Promise<{ 
           ))}
         </nav>
       </div>
+
+      <Aviso ok={q.ok} error={q.error} />
+      <form action={publicarComoClub} className="mb-5 rounded-2xl border border-borde bg-superficie p-4">
+        <label htmlFor="texto" className="text-sm font-semibold">
+          Habla como club
+        </label>
+        <textarea id="texto" name="texto" rows={2} maxLength={LIMITE_COMUNICADO} required placeholder="Un comunicado para la afición…" className="mt-2 w-full resize-none rounded-xl border border-borde bg-fondo p-3 text-sm" />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-suave">Máximo dos por jornada. La afición contesta, pero solo los resultados mueven su ánimo.</p>
+          <button className="rounded-full bg-cesped px-4 py-1.5 text-sm font-semibold text-white dark:text-black">Publicar</button>
+        </div>
+      </form>
 
       <div className="grid gap-5 lg:grid-cols-12">
         <section aria-label="Publicaciones" className="min-w-0 overflow-hidden rounded-2xl border border-borde bg-superficie lg:col-span-8 xl:col-span-7">

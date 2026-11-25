@@ -8,6 +8,7 @@ import { modoLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
 import { jugarSiguienteJornada } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
+import { ErrorGrada, publicarComunicado } from "@/servidor/grada";
 import { ErrorCantera, liberarJuvenil, subirJuvenil } from "@/servidor/cantera";
 import { ErrorObra, iniciarObra } from "@/servidor/instalaciones";
 import type { EdificioObra } from "@/dominio/reglas";
@@ -174,6 +175,18 @@ export async function decidirJuvenil(formulario: FormData): Promise<void> {
     volver(ruta, { ok: `${nombre} firma su primer contrato profesional. ¡Uno de la casa!` });
   } catch (e) {
     if (e instanceof ErrorCantera) volver(ruta, { error: e.message });
+    throw e;
+  }
+}
+
+/** El club habla en La Grada con su cuenta oficial. */
+export async function publicarComoClub(formulario: FormData): Promise<void> {
+  const club = await miClub();
+  try {
+    await publicarComunicado(club, String(formulario.get("texto") ?? ""));
+    volver("/grada", { ok: "Comunicado publicado. La grada ya está contestando." });
+  } catch (e) {
+    if (e instanceof ErrorGrada) volver("/grada", { error: e.message });
     throw e;
   }
 }

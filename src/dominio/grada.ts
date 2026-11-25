@@ -709,3 +709,39 @@ export function reacciones(rng: Rng, alcance: number, masaSocial: number, animo:
   const meGusta = Math.max(0, Math.round(base));
   return { meGusta, comentarios: Math.round(meGusta * (0.05 + rng() * 0.12)), compartidos: Math.round(meGusta * (0.03 + rng() * 0.1)) };
 }
+
+// -----------------------------------------------------------------------------
+// Comunicados del club
+// -----------------------------------------------------------------------------
+
+export const LIMITE_COMUNICADO = 280;
+
+/** Texto de un comunicado: sin espacios sobrantes; vacío o demasiado largo no vale. */
+export function limpiarComunicado(texto: string): string | null {
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  return limpio.length >= 3 && limpio.length <= LIMITE_COMUNICADO ? limpio : null;
+}
+
+/**
+ * El club publica con su cuenta oficial y la grada contesta según su ánimo. El comunicado no mueve el ánimo:
+ * la afición no se compra con palabras, solo con resultados y decisiones.
+ */
+export function reaccionesComunicado(texto: string, animo: number, voces: Voz[], rng: Rng): Borrador[] {
+  const oficial = buscar(voces, "oficial");
+  if (!oficial) return [];
+  const lista: Borrador[] = [{ autor: autorDe(oficial), texto, tono: "neutro", alcance: 1, respuestaA: undefined }];
+  const contento = animo >= 55;
+  const bancos: [Rasgo, string[], string[]][] = [
+    ["optimista", ["¡Así se hace, club! Todos con vosotros.", "Eso es dar la cara. ¡Vamos!"], ["Ojalá se note en el campo, que ya tocaba.", "Se agradece. Ahora, a demostrarlo."]],
+    ["pesimista", ["Palabras bonitas. Ahora que lleguen los hechos.", "Veremos si lo cumplen."], ["Ya nos han dicho eso antes. Los resultados mandan.", "Mucho comunicado y poco fútbol."]],
+    ["bromista", ["Esto con un bocadillo de tortilla sería perfecto.", "Retuit del alma. Sin ironía… casi."], ["El community manager hoy ha trabajado, eso hay que reconocerlo.", "Comunicado recibido. Cerveza pendiente."]],
+    ["ultra", ["La peña siempre con el club. ¡Aúpa!", "Aquí estaremos, llueva o truene."], ["Dentro de la peña hay opiniones, pero el escudo es el escudo.", "A ver si hablan menos y ganan más."]],
+  ];
+  for (const [rasgo, alegre, frio] of bancos) {
+    const voz = buscar(voces, rasgo);
+    if (!voz || lista.length >= 4) continue;
+    const banco = contento ? alegre : frio;
+    lista.push({ autor: autorDe(voz), texto: banco[Math.floor(rng() * banco.length)], tono: contento ? "positivo" : "neutro", alcance: 0.6, respuestaA: 0 });
+  }
+  return lista;
+}

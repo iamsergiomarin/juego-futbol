@@ -1,6 +1,9 @@
 import type { PGlite, Transaction } from "@electric-sql/pglite";
 import { crearRng, semillaAleatoria, type Rng } from "@/motor";
 import {
+  LIMITE_COMUNICADO,
+  limpiarComunicado,
+  reaccionesComunicado,
   analizarPartido,
   animoTrasEvento,
   animoTrasPartido,
@@ -56,7 +59,7 @@ interface Base {
 }
 
 /** Guarda las publicaciones en orden, con sus reacciones. Las respuestas cuelgan de la publicación indicada. */
-async function escribir(tx: Transaction, clubId: string, borradores: Borrador[], base: Base, rng: Rng = crearRng(semillaAleatoria())): Promise<void> {
+async function escribir(tx: Transaction, clubId: string, borradores: Borrador[], base: Base, rng: Rng = crearRng(semillaAleatoria()), comunicado = false): Promise<void> {
   if (borradores.length === 0) return;
   const club = (await tx.query<{ masa: number; animo: number }>("select masa_social as masa, animo_grada as animo from clubes where id = $1", [clubId])).rows[0];
   const ids: number[] = [];
@@ -68,10 +71,10 @@ async function escribir(tx: Transaction, clubId: string, borradores: Borrador[],
     const id = (
       await tx.query<{ id: number }>(
         `insert into publicaciones (club_id, temporada_id, jornada, partido_id, autor_tipo, autor_nombre, autor_usuario, texto, tono,
-                me_gusta, comentarios, compartidos, respuesta_a, fecha)
-         values ($1, (select id from temporadas where actual), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz)
+                me_gusta, comentarios, compartidos, respuesta_a, fecha, comunicado)
+         values ($1, (select id from temporadas where actual), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz, $14)
          returning id::float8 as id`,
-        [clubId, base.jornada, base.partidoId ?? null, b.autor.tipo, b.autor.nombre, b.autor.usuario, b.texto, b.tono, r.meGusta, r.comentarios, r.compartidos, padre, fecha],
+        [clubId, base.jornada, base.partidoId ?? null, b.autor.tipo, b.autor.nombre, b.autor.usuario, b.texto, b.tono, r.meGusta, r.comentarios, r.compartidos, padre, fecha, comunicado && i === 0],
       )
     ).rows[0].id;
     ids.push(id);
@@ -407,4 +410,30 @@ export async function estadoGrada(bd: Consulta, clubId: string): Promise<EstadoG
     masComentadas: top,
     etiquetas,
   };
+}
+
+const COMUNICADOS_POR_JORNADA = 2;
+
+export class ErrorGrada extends Error {}
+
+/** El mánager publica un comunicado con la cuenta oficial del club (máximo dos por jornada). */
+export async function publicarComunicado(clubId: string, texto: string): Promise<void> {
+  const limpio = limpiarComunicado(texto);
+  if (!limpio) throw new ErrorGrada(`El comunicado debe tener entre 3 y ${LIMITE_COMUNICADO} caracteres.`);
+  const bd = await bdLocal();
+  await bd.transaction(async (tx) => {
+    const voces = await vocesDe(tx, clubId);
+    if (voces.length === 0) throw new ErrorGrada("La grada todavía no existe.");
+    const jornada = (await tx.query<{ j: number }>("select count(distinct jornada)::int as j from partidos where temporada_id = (select id from temporadas where actual) and estado = 'finalizado'")).rows[0].j;
+    const hechos = (
+      await tx.query<{ n: number }>(
+        "select count(*)::int as n from publicaciones where club_id = $1 and autor_tipo = 'club' and comunicado and temporada_id = (select id from temporadas where actual) and jornada is not distinct from $2",
+        [clubId, jornada || null],
+      )
+    ).rows[0].n;
+    if (hechos >= COMUNICADOS_POR_JORNADA) throw new ErrorGrada("Ya has publicado dos comunicados esta jornada: deja hablar a la grada.");
+    const animo = (await tx.query<{ a: number }>("select animo_grada as a from clubes where id = $1", [clubId])).rows[0].a;
+    const fecha = sumarMinutos(await fechaJuego(tx), 15 * 60);
+    await escribir(tx, clubId, reaccionesComunicado(limpio, animo, voces, crearRng(semillaAleatoria())), { jornada: jornada || null, fecha }, undefined, true);
+  });
 }

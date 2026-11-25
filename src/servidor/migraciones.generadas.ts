@@ -27,5 +27,9 @@ export const MIGRACIONES: { nombre: string; sql: string }[] = [
   {
     "nombre": "0007_cantera.sql",
     "sql": "-- Cantera: juveniles de la academia (fuera del primer equipo hasta que se les da contrato profesional).\ncreate table juveniles (\n  id uuid primary key default gen_random_uuid(),\n  club_id uuid not null references clubes (id) on delete cascade,\n  temporada_id int not null references temporadas (id),\n  hornada text not null check (hornada in ('pretemporada', 'mitad', 'inauguracion')),\n  nombre text not null,\n  apellido text not null,\n  fecha_nacimiento date not null,\n  posicion posicion not null,\n  atributos jsonb not null,           -- decimales: crecen poco a poco\n  media numeric(3, 1) not null,\n  potencial smallint not null,        -- oculto\n  personalidad personalidad not null default 'normal',\n  joya boolean not null default false,\n  estado text not null default 'academia' check (estado in ('academia', 'subido', 'liberado')),\n  creado_en timestamptz not null default now()\n);\ncreate index juveniles_por_club on juveniles (club_id, estado);\n"
+  },
+  {
+    "nombre": "0008_comunicados.sql",
+    "sql": "-- Comunicados del club en La Grada: marca de la publicación inicial para limitarlos por jornada.\nalter table publicaciones add column comunicado boolean not null default false;\n"
   }
 ];
