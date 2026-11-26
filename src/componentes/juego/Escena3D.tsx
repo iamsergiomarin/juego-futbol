@@ -356,7 +356,7 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
     const escena = new THREE.Scene();
     const pintarCielo = () => {
       escena.background = new THREE.Color(oscuro.matches ? "#0f1f33" : "#bcd8e6");
-      escena.fog = new THREE.Fog(oscuro.matches ? "#0f1f33" : "#cfe3e6", 55, 105);
+
     };
     pintarCielo();
     oscuro.addEventListener("change", pintarCielo);
@@ -452,20 +452,6 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
         escena.add(f);
       }
 
-    // Coches: unos pocos recorren las calles horizontales
-    const coches: { m: THREE.Mesh; z: number; v: number; o: number }[] = [];
-    const movimientoReducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const colCoche = ["#c0392b", "#2e6da4", "#e0a82e", "#f4f1e8", "#6b8e5a"];
-    for (let i = 0; i < 7; i++) {
-      const c = new THREE.Group();
-      caja(c, 0.8, 0.22, 0.4, colCoche[i % colCoche.length], 0, 0, 0);
-      caja(c, 0.4, 0.16, 0.34, "#34495a", -0.05, 0.22, 0);
-      const z = CALLES_Z[i % 3] + (i % 2 ? 0.4 : -0.4);
-      c.position.set(0, 0.03, z);
-      escena.add(c);
-      coches.push({ m: c as unknown as THREE.Mesh, z, v: (i % 2 ? -1 : 1) * (0.9 + (i % 3) * 0.3), o: i * 9.3 });
-    }
-
     const hills: [number, number, number, number][] = [[-34, -44, 11, 3.2], [-12, -48, 14, 3.8], [14, -46, 12, 3.4], [36, -43, 11, 3]];
     for (const [x, z, r, a] of hills) {
       const c = new THREE.Mesh(new THREE.ConeGeometry(r, a, 7), material(oscuro.matches ? "#1d3a2a" : "#8fb698"));
@@ -478,33 +464,36 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
     const resalte = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: "#f4f1e8", dashSize: 0.25, gapSize: 0.18 }));
     escena.add(resalte);
 
-    const camara = new THREE.PerspectiveCamera(34, 2, 0.1, 150);
+    const camara = new THREE.OrthographicCamera(-20, 20, 10, -10, 0.1, 250);
     const controles = new OrbitControls(camara, renderer.domElement);
-    controles.target.set(-0.5, 0, -0.5);
+    controles.target.set(-0.5, 0, -0.2);
     controles.enableDamping = true;
-    controles.enablePan = false;
-    controles.minAzimuthAngle = -1.0;
-    controles.maxAzimuthAngle = 1.0;
-    controles.minPolarAngle = 0.35;
-    controles.maxPolarAngle = 1.2;
-    controles.minDistance = 10;
-    controles.maxDistance = 48;
-    controles.zoomSpeed = 0.7;
+    // Vista ortográfica y sin giro lateral: las manzanas se ven como rectángulos alineados.
+    controles.enablePan = true;
+    controles.screenSpacePanning = false;
+    controles.minAzimuthAngle = 0;
+    controles.maxAzimuthAngle = 0;
+    controles.minPolarAngle = 0.3;
+    controles.maxPolarAngle = 1.15;
+    controles.minZoom = 1;
+    controles.maxZoom = 3.2;
+    controles.zoomSpeed = 0.8;
 
-    let distanciaBase = 22;
     const ajustar = () => {
       const w = cont.clientWidth;
       const h = cont.clientHeight;
       if (!w || !h) return;
       renderer.setSize(w, h, false);
-      camara.aspect = w / h;
+      const aspecto = w / h;
+      const mitadAlto = Math.max(16.8 / aspecto, 8.6);
+      camara.left = -mitadAlto * aspecto;
+      camara.right = mitadAlto * aspecto;
+      camara.top = mitadAlto;
+      camara.bottom = -mitadAlto;
       camara.updateProjectionMatrix();
-      const necesaria = 16.5 / (Math.tan(THREE.MathUtils.degToRad(camara.fov / 2)) * camara.aspect);
-      distanciaBase = Math.min(controles.maxDistance, Math.max(22, necesaria));
-      const dir = new THREE.Vector3().subVectors(camara.position, controles.target).normalize();
-      camara.position.copy(controles.target).addScaledVector(dir, distanciaBase);
     };
-    camara.position.set(0, 20, 20);
+    camara.position.set(-0.5, 32, 40);
+    camara.lookAt(controles.target);
     ajustar();
     const observador = new ResizeObserver(ajustar);
     observador.observe(cont);
@@ -568,12 +557,6 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
       requestAnimationFrame(bucle);
       if (document.hidden) return;
       controles.update();
-      const ahora = performance.now() / 1000;
-      for (const c of coches) {
-        const x = movimientoReducido ? c.o - 14 : ((((ahora * c.v + c.o) % 31) + 31) % 31) - 15.5;
-        c.m.position.x = x;
-        c.m.rotation.y = c.v > 0 ? 0 : Math.PI;
-      }
       const el = elegidoRef.current;
       if (el !== anterior) {
         anterior = el;
