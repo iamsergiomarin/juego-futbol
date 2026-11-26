@@ -38,7 +38,14 @@ function volver(ruta: string, aviso: { ok?: string; error?: string }): never {
  */
 export async function avanzarJornadas(): Promise<void> {
   await miClub();
-  await jugarSiguienteJornada();
+  try {
+    await jugarSiguienteJornada();
+  } catch (e) {
+    // La jornada se juega en una transacción: si falla no queda nada a medias. Se muestra el motivo en pantalla.
+    console.error("Error al jugar la jornada:", e);
+    const motivo = e instanceof Error ? e.message : String(e);
+    volver("/inicio", { error: `No se ha podido jugar la jornada: ${motivo}` });
+  }
   revalidatePath("/", "layout");
   redirect("/inicio");
 }
