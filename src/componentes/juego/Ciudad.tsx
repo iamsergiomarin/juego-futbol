@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { formatoEuros, formatoFechaHora, NOMBRE_INSTALACION } from "@/componentes/formato";
 import { mejorarEdificio } from "@/app/(juego)/acciones";
+
+const Escena3D = dynamic(() => import("./Escena3D").then((m) => m.Escena3D), {
+  ssr: false,
+  loading: () => <div className="aspect-[4/3] w-full sm:aspect-[2.3/1]" />,
+});
 
 export interface EdificioCiudad {
   tipo: string;
@@ -42,6 +48,7 @@ const COLOCACION: Record<string, { x: number; base: number; escala: number }> = 
 
 export function Ciudad({ edificios, principal, secundario, aforo, dinero, nombreClub }: Props) {
   const [elegido, setElegido] = useState<string>("estadio");
+  const [sin3d, setSin3d] = useState(false);
   const nivelDe = (t: string) => edificios.find((e) => e.tipo === t)?.nivel ?? 0;
   const obraDe = (t: string) => edificios.find((e) => e.tipo === t)?.obra ?? null;
   const e = edificios.find((x) => x.tipo === elegido)!;
@@ -58,6 +65,7 @@ export function Ciudad({ edificios, principal, secundario, aforo, dinero, nombre
   return (
     <section aria-label={`Ciudad de ${nombreClub}`}>
       <div className="overflow-hidden rounded-3xl border border-borde bg-noche">
+        {sin3d ? (
         <svg viewBox={`0 ${arriba} 1200 ${540 - arriba}`} role="img" aria-label="Los edificios del club" className="block h-auto w-full">
           <defs>
             <linearGradient id="cielo" x1="0" y1="0" x2="0" y2="1">
@@ -147,6 +155,22 @@ export function Ciudad({ edificios, principal, secundario, aforo, dinero, nombre
             {aforo.toLocaleString("es-ES")} localidades
           </text>
         </svg>
+        ) : (
+          <div className="relative">
+            <Escena3D
+              edificios={edificios.map((x) => ({ tipo: x.tipo, nivel: x.nivel, enObra: !!x.obra }))}
+              elegido={elegido}
+              onElegir={setElegido}
+              onFallo={() => setSin3d(true)}
+              principal={principal}
+              secundario={secundario}
+            />
+            <p className="titulo pointer-events-none absolute bottom-2 left-4 text-lg font-semibold text-tiza/90 sm:text-xl">{nombreClub}</p>
+            <p className="titulo pointer-events-none absolute right-4 bottom-2 text-lg font-semibold text-tiza/90 sm:text-xl">
+              {aforo.toLocaleString("es-ES")} localidades
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
