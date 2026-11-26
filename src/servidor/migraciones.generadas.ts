@@ -35,5 +35,9 @@ export const MIGRACIONES: { nombre: string; sql: string }[] = [
   {
     "nombre": "0009_filial.sql",
     "sql": "-- Filial: los juveniles pueden pasar de la academia al filial y el filial juega su propia liga (una vuelta, domingos).\nalter table juveniles drop constraint juveniles_estado_check;\nalter table juveniles add constraint juveniles_estado_check check (estado in ('academia', 'filial', 'subido', 'liberado'));\nalter table juveniles add column partidos_filial smallint not null default 0;\n\ncreate table partidos_filial (\n  id uuid primary key default gen_random_uuid(),\n  temporada_id int not null references temporadas (id),\n  grupo_id int not null references grupos (id),\n  jornada smallint not null,\n  local_id uuid not null references clubes (id),\n  visitante_id uuid not null references clubes (id),\n  inicio timestamptz not null,\n  semilla int not null,\n  estado text not null default 'pendiente' check (estado in ('pendiente', 'finalizado')),\n  goles_local smallint,\n  goles_visitante smallint\n);\ncreate index partidos_filial_por_jornada on partidos_filial (temporada_id, jornada);\ncreate index partidos_filial_por_club on partidos_filial (local_id, visitante_id);\n"
+  },
+  {
+    "nombre": "0010_dias_entrenamiento.sql",
+    "sql": "-- Los días de entrenamiento entre partidos se juegan de uno en uno: cuántos se han hecho desde el último partido.\nalter table temporadas add column dias_entrenados smallint not null default 0;\n"
   }
 ];

@@ -6,7 +6,7 @@ import type { Foco, PlanEntrenamiento } from "@/dominio/entrenamiento";
 import type { Planteamiento } from "@/dominio/tactica";
 import { modoLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
-import { jugarSiguienteJornada } from "@/servidor/liga";
+import { jugarSiguienteJornada, pasarDia } from "@/servidor/liga";
 import { ErrorMercado, ficharJugador, ponerEnVenta, renovarContrato } from "@/servidor/mercado";
 import { ErrorGrada, publicarComunicado } from "@/servidor/grada";
 import { darFicha, ErrorFilial, pasarAlFilial, volverALaAcademia } from "@/servidor/filial";
@@ -48,6 +48,14 @@ export async function avanzarJornadas(): Promise<void> {
   }
   revalidatePath("/", "layout");
   redirect("/inicio");
+}
+
+/** Pasa un día de entrenamiento (los días entre partidos se juegan de uno en uno). */
+export async function avanzarDia(): Promise<void> {
+  await miClub();
+  await pasarDia();
+  revalidatePath("/", "layout");
+  redirect("/equipo/entrenamiento");
 }
 
 export async function empezarTemporada(): Promise<void> {

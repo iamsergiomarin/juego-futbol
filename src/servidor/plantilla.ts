@@ -1,6 +1,6 @@
 import type { PGlite, Transaction } from "@electric-sql/pglite";
 import type { EquipoPartido, JugadorPartido, Posicion } from "@/motor";
-import { PLAN_POR_DEFECTO, type Foco, type PlanEntrenamiento } from "@/dominio/entrenamiento";
+import { DIAS, PLAN_POR_DEFECTO, despuesDeJornada, diaActual, diasDesbloqueados, type DiaSemana, type Foco, type PlanEntrenamiento } from "@/dominio/entrenamiento";
 import {
   completarPlanteamiento,
   factorPosicion,
@@ -84,6 +84,19 @@ export async function guardarPlanteamiento(clubId: string, p: Planteamiento): Pr
   await bd.query("update clubes set planteamiento = $2::jsonb where id = $1", [clubId, JSON.stringify(p)]);
 }
 
+/** Estado del calendario entre partidos: jornadas jugadas, días entrenados y el día de la semana en que está el juego. */
+export async function estadoSemana(bd: Consulta): Promise<{ jugadas: number; hechos: number; hoy: DiaSemana; diasPendientes: number }> {
+  const f = (
+    await bd.query<{ jugadas: number; hechos: number }>(
+      `select coalesce((select min(jornada) from partidos p where p.temporada_id = t.id and p.competicion in ('liga', 'playoff') and p.estado <> 'finalizado'), 1)::int - 1 as jugadas,
+              t.dias_entrenados::int as hechos
+         from temporadas t where t.actual`,
+    )
+  ).rows[0] ?? { jugadas: 0, hechos: 0 };
+  const { dias } = despuesDeJornada(f.jugadas);
+  return { jugadas: f.jugadas, hechos: f.hechos, hoy: diaActual(f.jugadas, f.hechos), diasPendientes: Math.max(0, dias.length - f.hechos) };
+}
+
 export async function planEntrenamiento(bd: Consulta, clubId: string): Promise<PlanEntrenamiento> {
   const guardado = (await bd.query<{ e: PlanEntrenamiento | null }>("select entrenamiento as e from clubes where id = $1", [clubId])).rows[0]?.e;
   return { ...PLAN_POR_DEFECTO, ...(guardado ?? {}) };
@@ -92,6 +105,11 @@ export async function planEntrenamiento(bd: Consulta, clubId: string): Promise<P
 export async function guardarEntrenamiento(clubId: string, plan: PlanEntrenamiento, focos: Record<string, Foco | null>): Promise<void> {
   const bd = await bdLocal();
   await bd.transaction(async (tx) => {
+    // Solo se pueden cambiar ayer, hoy y mañana: el resto de días conserva lo que ya había guardado.
+    const { hoy } = await estadoSemana(tx);
+    const abiertos = new Set<string>(diasDesbloqueados(hoy));
+    const actual = await planEntrenamiento(tx, clubId);
+    for (const dia of DIAS) if (!abiertos.has(dia)) plan[dia] = actual[dia];
     await tx.query("update clubes set entrenamiento = $2::jsonb where id = $1", [clubId, JSON.stringify(plan)]);
     for (const [jugador, foco] of Object.entries(focos)) {
       await tx.query("update jugadores set foco = $3 where id = $1 and club_id = $2", [jugador, clubId, foco]);

@@ -31,6 +31,33 @@ describe("gestión deportiva en una partida local", () => {
     );
   }, 60_000);
 
+  it("el entrenamiento solo deja cambiar ayer, hoy y mañana y los días pasan de uno en uno", async () => {
+    const antes = await m.plantilla.planEntrenamiento(m.bd, clubId);
+    const intento = { ...antes, martes: { enfoque: "fisico" as const, intensidad: "intensa" as const }, jueves: { enfoque: "recuperacion" as const, intensidad: "suave" as const } };
+    // Antes de jugar la primera jornada es lunes: se abren domingo, lunes y martes.
+    expect((await m.plantilla.estadoSemana(m.bd)).hoy).toBe("lunes");
+    await m.plantilla.guardarEntrenamiento(clubId, intento, {});
+    const guardado = await m.plantilla.planEntrenamiento(m.bd, clubId);
+    expect(guardado.martes.intensidad).toBe("intensa");
+    expect(guardado.jueves).toEqual(antes.jueves);
+    // Tras el partido del lunes, cada día que pasa abre el siguiente.
+    await m.liga.jugarSiguienteJornada();
+    expect((await m.plantilla.estadoSemana(m.bd)).hoy).toBe("martes");
+    expect(await m.liga.pasarDia()).toBe(true);
+    expect((await m.plantilla.estadoSemana(m.bd)).hoy).toBe("miercoles");
+    await m.liga.pasarDia();
+    await m.liga.pasarDia();
+    expect((await m.plantilla.estadoSemana(m.bd)).hoy).toBe("viernes");
+    await m.liga.pasarDia();
+    expect((await m.plantilla.estadoSemana(m.bd)).hoy).toBe("sabado");
+    expect(await m.liga.pasarDia()).toBe(false);
+    // El partido del sábado reinicia la cuenta y deja el domingo por entrenar.
+    await m.liga.jugarSiguienteJornada();
+    const semana = await m.plantilla.estadoSemana(m.bd);
+    expect(semana.hoy).toBe("domingo");
+    expect(semana.diasPendientes).toBe(1);
+  });
+
   it("guarda un planteamiento propio y rechaza uno inválido", async () => {
     const js = await m.plantilla.jugadoresEstado(m.bd, clubId);
     const { once, banquillo } = m.tactica.alineacionAutomatica(m.plantilla.alineables(js), "4-3-3");

@@ -4,6 +4,7 @@ import { calendarioDobleVuelta, fechaJornada } from "@/dominio/calendario";
 import {
   aplicarSesion,
   despuesDeJornada,
+  type DiaEntreno,
   ESTADO_FISICO,
   recuperar,
   sortearLesion,
@@ -22,7 +23,7 @@ import { desarrollarJuveniles, generarHornadas } from "./cantera";
 import { terminarObras } from "./instalaciones";
 import { crearCalendarioFilial, jugarFilial } from "./filial";
 import { publicarNoticia } from "./noticias";
-import { equipoParaPartido, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
+import { equipoParaPartido, estadoSemana, jugadoresEstado, planEntrenamiento, type JugadorEstado } from "./plantilla";
 import { avanzarPlayoff, crearPlayoff } from "./temporada";
 
 /**
@@ -251,8 +252,18 @@ async function calidadPuesto(tx: Transaction, clubId: string, puesto: string): P
  * Días entre partidos: entrenamientos (progreso, cansancio y riesgo de lesión), recuperación,
  * altas médicas e informe semanal para el mánager.
  */
-async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number, lesionadosEnPartido: Set<string>, rng: Rng) {
-  const { dias, diasHastaPartido } = despuesDeJornada(jornada);
+async function entreJornadas(
+  tx: Transaction,
+  t: { id: number },
+  jornada: number,
+  lesionadosEnPartido: Set<string>,
+  rng: Rng,
+  /** Sin días: es lo que ocurre justo tras el partido. Con días: las sesiones que se hacen ahora. */
+  dias: DiaEntreno[] = [],
+) {
+  const trasPartido = dias.length === 0;
+  // La noche tras el partido se recupera un día; cada día de sesión, otro (en total, los días hasta el siguiente partido).
+  const diasRecuperacion = trasPartido ? 1 : dias.length;
   const inicioSemana = dias.includes("martes");
   const clubes = (
     await tx.query<{ id: string; humano: boolean; ciudad: number; medico: number }>(
@@ -286,7 +297,7 @@ async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number
       let jornadasLesion = j.jornadasLesion;
       let tipoLesion = j.tipoLesion;
       // La baja se descuenta por jornada disputada (salvo si la lesión es de este mismo partido).
-      if (jornadasLesion > 0 && !lesionadosEnPartido.has(j.id)) {
+      if (trasPartido && jornadasLesion > 0 && !lesionadosEnPartido.has(j.id)) {
         jornadasLesion -= 1;
         // Un buen centro médico recorta a veces una jornada más de baja.
         if (jornadasLesion > 0 && rng() < club.medico * OBRAS_EDIFICIOS.recuperacionPorNivelMedico) jornadasLesion -= 1;
@@ -310,7 +321,7 @@ async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number
       const media = mediaJugador(entrenable.atributos);
       cambios.push({
         id: j.id,
-        cansancio: recuperar(entrenable.cansancio, diasHastaPartido, preparador),
+        cansancio: recuperar(entrenable.cansancio, diasRecuperacion, preparador),
         forma: j.forma,
         moral: j.moral,
         jornadas_lesion: jornadasLesion,
@@ -357,6 +368,22 @@ async function entreJornadas(tx: Transaction, t: { id: number }, jornada: number
   await guardarEstados(tx, cambios);
 }
 
+/** Pasa un día: hace la sesión de entrenamiento del día en todos los clubes. No hace nada si el siguiente día es de partido. */
+export async function pasarDia(): Promise<boolean> {
+  await asegurarCalendario();
+  const bd = await bdLocal();
+  return bd.transaction(async (tx) => {
+    const t = (await tx.query<{ id: number }>("select id from temporadas where actual")).rows[0];
+    if (!t) return false;
+    const { jugadas, hechos } = await estadoSemana(tx);
+    const { dias } = despuesDeJornada(jugadas);
+    if (hechos >= dias.length) return false;
+    await entreJornadas(tx, t, jugadas, new Set(), crearRng(semillaAleatoria()), [dias[hechos]]);
+    await tx.query("update temporadas set dias_entrenados = dias_entrenados + 1 where id = $1", [t.id]);
+    return true;
+  });
+}
+
 export interface ResultadoJornada {
   jornada: number;
   partidos: number;
@@ -389,6 +416,13 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
         [t.id, siguiente],
       )
     ).rows;
+
+    // Los días de entrenamiento que el mánager no ha ido pasando se hacen ahora, antes del partido.
+    const { dias: diasEntre } = despuesDeJornada(siguiente - 1);
+    const hechos = (await tx.query<{ n: number }>("select dias_entrenados::int as n from temporadas where id = $1", [t.id])).rows[0].n;
+    if (hechos < diasEntre.length) {
+      await entreJornadas(tx, t, siguiente - 1, new Set(), crearRng(Math.floor(partidos[0]?.semilla ?? 1) + 3), diasEntre.slice(hechos));
+    }
 
     const lesionados = new Set<string>();
     const lesionesPartido: LesionPartido[] = [];
@@ -425,6 +459,7 @@ export async function jugarSiguienteJornada(): Promise<ResultadoJornada | null> 
 
     const rng = crearRng(Math.floor(partidos[0]?.semilla ?? 1) + 7);
     await entreJornadas(tx, t, siguiente, lesionados, rng);
+    await tx.query("update temporadas set dias_entrenados = 0 where id = $1", [t.id]);
     await actividadMercadoJornada(tx, t.id, siguiente, rng);
 
     // Fin de la liga: arranca el playoff. Tras cada ronda de playoff, la siguiente.

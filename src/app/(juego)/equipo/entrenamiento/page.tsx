@@ -2,7 +2,8 @@ import { Pestanas } from "@/componentes/juego/Pestanas";
 import { bdLocal } from "@/servidor/bd";
 import { managerLocal } from "@/servidor/consultas";
 import { potencialEstimado } from "@/servidor/jugador";
-import { jugadoresEstado, planEntrenamiento } from "@/servidor/plantilla";
+import { despuesDeJornada } from "@/dominio/entrenamiento";
+import { estadoSemana, jugadoresEstado, planEntrenamiento } from "@/servidor/plantilla";
 import { PESTANAS_EQUIPO } from "../pestanas";
 import { FormularioEntrenamiento } from "./FormularioEntrenamiento";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function Entrenamiento() {
   const manager = (await managerLocal())!;
   const bd = await bdLocal();
+  const semana = await estadoSemana(bd);
   const [jugadores, plan, calidad] = await Promise.all([
     jugadoresEstado(bd, manager.clubId),
     planEntrenamiento(bd, manager.clubId),
@@ -21,6 +23,9 @@ export default async function Entrenamiento() {
       <Pestanas titulo="Equipo" pestanas={PESTANAS_EQUIPO} />
       <FormularioEntrenamiento
         planInicial={plan}
+        hoy={semana.hoy}
+        hechos={despuesDeJornada(semana.jugadas).dias.slice(0, semana.hechos)}
+        diasPendientes={semana.diasPendientes}
         jugadores={jugadores.map((j) => ({
           id: j.id,
           nombre: `${j.nombre} ${j.apellido}`,

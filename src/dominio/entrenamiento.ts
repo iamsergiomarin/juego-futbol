@@ -9,10 +9,22 @@ import { gauss, uniforme } from "@/motor";
 
 export type Enfoque = "fisico" | "tecnico" | "tactico" | "balon_parado" | "recuperacion";
 export type Intensidad = "suave" | "normal" | "intensa";
-export type DiaEntreno = "martes" | "jueves" | "viernes" | "domingo";
+/** Días con sesión de entrenamiento (los de partido, lunes y sábado, no tienen). */
+export type DiaEntreno = "martes" | "miercoles" | "jueves" | "viernes" | "domingo";
+export type DiaSemana = "lunes" | "martes" | "miercoles" | "jueves" | "viernes" | "sabado" | "domingo";
 export type Foco = "tecnico" | "fisico" | "tactico" | "porteria";
 
-export const DIAS: DiaEntreno[] = ["martes", "jueves", "viernes", "domingo"];
+export const DIAS: DiaEntreno[] = ["martes", "miercoles", "jueves", "viernes", "domingo"];
+export const SEMANA: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+export const NOMBRE_DIA: Record<DiaSemana, string> = {
+  lunes: "Lunes",
+  martes: "Martes",
+  miercoles: "Miércoles",
+  jueves: "Jueves",
+  viernes: "Viernes",
+  sabado: "Sábado",
+  domingo: "Domingo",
+};
 
 export const NOMBRE_ENFOQUE: Record<Enfoque, string> = {
   fisico: "Físico",
@@ -34,6 +46,7 @@ export type PlanEntrenamiento = Record<DiaEntreno, Sesion>;
 
 export const PLAN_POR_DEFECTO: PlanEntrenamiento = {
   martes: { enfoque: "fisico", intensidad: "normal" },
+  miercoles: { enfoque: "tecnico", intensidad: "suave" },
   jueves: { enfoque: "tecnico", intensidad: "normal" },
   viernes: { enfoque: "tactico", intensidad: "suave" },
   domingo: { enfoque: "recuperacion", intensidad: "suave" },
@@ -58,10 +71,29 @@ export function atributosDeGrupo(grupo: Foco | "balon_parado", atributos: Record
   return GRUPOS[grupo].filter((a) => a in atributos);
 }
 
-/** Sesiones y días de descanso que hay tras cada jornada hasta la siguiente. */
+/**
+ * Sesiones y días de descanso que hay tras cada jornada hasta la siguiente.
+ * Jornada impar = lunes → martes a viernes antes del sábado. Par = sábado → domingo.
+ */
 export function despuesDeJornada(jornada: number): { dias: DiaEntreno[]; diasHastaPartido: number } {
-  // Jornada impar = lunes → martes, jueves y viernes antes del sábado. Par = sábado → domingo.
-  return jornada % 2 === 1 ? { dias: ["martes", "jueves", "viernes"], diasHastaPartido: 5 } : { dias: ["domingo"], diasHastaPartido: 2 };
+  return jornada % 2 === 1
+    ? { dias: ["martes", "miercoles", "jueves", "viernes"], diasHastaPartido: 5 }
+    : jornada === 0
+      ? { dias: [], diasHastaPartido: 0 }
+      : { dias: ["domingo"], diasHastaPartido: 2 };
+}
+
+/** El día de la semana en que está el juego: el siguiente entrenamiento por hacer o, si no quedan, el partido. */
+export function diaActual(jornadasJugadas: number, diasHechos: number): DiaSemana {
+  const { dias } = despuesDeJornada(jornadasJugadas);
+  if (diasHechos < dias.length) return dias[diasHechos];
+  return jornadasJugadas % 2 === 1 ? "sabado" : "lunes";
+}
+
+/** Ayer, hoy y mañana: los únicos días de la semana que se pueden configurar. */
+export function diasDesbloqueados(hoy: DiaSemana): DiaSemana[] {
+  const i = SEMANA.indexOf(hoy);
+  return [SEMANA[(i + 6) % 7], hoy, SEMANA[(i + 1) % 7]];
 }
 
 export const ESTADO_FISICO = {
