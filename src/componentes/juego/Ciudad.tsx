@@ -8,7 +8,7 @@ import { mejorarEdificio } from "@/app/(juego)/acciones";
 
 const Escena3D = dynamic(() => import("./Escena3D").then((m) => m.Escena3D), {
   ssr: false,
-  loading: () => <div className="aspect-[4/3] w-full sm:aspect-[2.3/1]" />,
+  loading: () => <div className="aspect-[5/4] w-full sm:aspect-[2/1]" />,
 });
 
 export interface EdificioCiudad {

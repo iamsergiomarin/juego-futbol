@@ -22,12 +22,55 @@ interface Props {
 
 /** Posición y huella (ancho × fondo) de cada edificio sobre el terreno. */
 const SITIO: Record<string, { x: number; z: number; ancho: number; fondo: number }> = {
-  ciudad_deportiva: { x: -9.6, z: -3.2, ancho: 4.6, fondo: 3.4 },
-  sede: { x: -5.2, z: 0.5, ancho: 2.4, fondo: 2.4 },
-  estadio: { x: 0.6, z: 0, ancho: 7, fondo: 5.4 },
-  centro_medico: { x: 6.2, z: 0.8, ancho: 2.4, fondo: 2.4 },
-  escuela_cantera: { x: 10.2, z: -3, ancho: 3.2, fondo: 2.6 },
+  ciudad_deportiva: { x: -10.6, z: -5.6, ancho: 4.6, fondo: 3.4 },
+  escuela_cantera: { x: 9.6, z: -5.6, ancho: 3.2, fondo: 2.6 },
+  sede: { x: -10.6, z: 2.8, ancho: 2.4, fondo: 2.4 },
+  estadio: { x: -1, z: 2.8, ancho: 7, fondo: 5.4 },
+  centro_medico: { x: 9.6, z: 2.8, ancho: 2.4, fondo: 2.4 },
 };
+
+/** Manzanas de la ciudad (la del aparcamiento no es un edificio del club). */
+const MANZANAS = [
+  { x: -10.6, z: -5.6, w: 6.8, d: 6.8 },
+  { x: -1, z: -5.6, w: 8.8, d: 6.8 },
+  { x: 9.6, z: -5.6, w: 8.8, d: 6.8 },
+  { x: -10.6, z: 2.8, w: 6.8, d: 6.4 },
+  { x: -1, z: 2.8, w: 8.8, d: 6.4 },
+  { x: 9.6, z: 2.8, w: 8.8, d: 6.4 },
+];
+const CALLES_X = [-14.9, -6.3, 4.3, 14.9];
+const CALLES_Z = [-9.9, -1.3, 6.9];
+const ALTURA_MANZANA = 0.065;
+
+function azar(semilla: number) {
+  let e = semilla;
+  return () => {
+    e = (e * 1664525 + 1013904223) % 4294967296;
+    return e / 4294967296;
+  };
+}
+
+function aparcamiento() {
+  const g = new THREE.Group();
+  caja(g, 7.2, 0.04, 4.6, "#3b4248", 0, 0, 0);
+  for (let i = -4; i <= 4; i++) {
+    caja(g, 0.04, 0.02, 1.3, "#f4f1e8", i * 0.8, 0.04, -1.5);
+    caja(g, 0.04, 0.02, 1.3, "#f4f1e8", i * 0.8, 0.04, 1.5);
+  }
+  const r = azar(7);
+  const colores = ["#c0392b", "#2e6da4", "#e0a82e", "#f4f1e8", "#2b3438", "#6b8e5a", "#8a5a9c"];
+  for (let i = -4; i < 4; i++)
+    for (const z of [-1.5, 1.5]) {
+      if (r() < 0.3) continue;
+      const x = i * 0.8 + 0.4;
+      caja(g, 0.46, 0.2, 0.9, colores[Math.floor(r() * colores.length)], x, 0.04, z);
+      caja(g, 0.38, 0.14, 0.45, "#34495a", x, 0.24, z);
+    }
+  caja(g, 1.2, 0.5, 0.8, "#e9e6dc", 2.6, 0.04, -3.1);
+  caja(g, 1.3, 0.08, 0.9, "#59636a", 2.6, 0.54, -3.1);
+  return g;
+}
+
 
 const TIPOS = Object.keys(SITIO);
 
@@ -313,48 +356,118 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
     const escena = new THREE.Scene();
     const pintarCielo = () => {
       escena.background = new THREE.Color(oscuro.matches ? "#0f1f33" : "#bcd8e6");
-      escena.fog = new THREE.Fog(oscuro.matches ? "#0f1f33" : "#cfe3e6", 38, 70);
+      escena.fog = new THREE.Fog(oscuro.matches ? "#0f1f33" : "#cfe3e6", 55, 105);
     };
     pintarCielo();
     oscuro.addEventListener("change", pintarCielo);
 
     escena.add(new THREE.HemisphereLight("#ffffff", "#5b8a62", oscuro.matches ? 0.8 : 1.15));
     const sol = new THREE.DirectionalLight("#fff4de", oscuro.matches ? 1.0 : 2.0);
-    sol.position.set(-9, 16, 11);
+    sol.position.set(-10, 20, 12);
     sol.castShadow = true;
     sol.shadow.mapSize.set(2048, 2048);
-    Object.assign(sol.shadow.camera, { left: -17, right: 17, top: 12, bottom: -12, near: 1, far: 50 });
+    Object.assign(sol.shadow.camera, { left: -19, right: 19, top: 14, bottom: -14, near: 1, far: 60 });
     sol.shadow.bias = -0.0005;
     escena.add(sol);
 
-    // Terreno: césped segado, calle y colinas
+    // Ciudad: césped, calles en cuadrícula, manzanas con acera, árboles y farolas
     const suelo = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 70),
-      new THREE.MeshStandardMaterial({
-        map: textura(128, 128, (c) => {
-          for (let i = 0; i < 4; i++) {
-            c.fillStyle = i % 2 ? "#26753f" : "#2a7e44";
-            c.fillRect(i * 32, 0, 32, 128);
-          }
-        }, [30, 18]),
-        roughness: 1,
-      }),
+      new THREE.PlaneGeometry(140, 90),
+      new THREE.MeshStandardMaterial({ color: oscuro.matches ? "#1f5a33" : "#3f8f4e", roughness: 1 }),
     );
     suelo.rotation.x = -Math.PI / 2;
     suelo.receiveShadow = true;
     escena.add(suelo);
-    const calle = new THREE.Mesh(new THREE.PlaneGeometry(120, 2.2), material("#2d3a33"));
-    calle.rotation.x = -Math.PI / 2;
-    calle.position.set(0, 0.01, 5.2);
-    calle.receiveShadow = true;
-    escena.add(calle);
-    for (let x = -28; x <= 28; x += 2.4) {
-      const raya = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.08), material("#f4f1e8"));
-      raya.rotation.x = -Math.PI / 2;
-      raya.position.set(x, 0.02, 5.2);
-      escena.add(raya);
+    const plano = (w: number, d: number, x: number, z: number, y: number, color: string) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material(color));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, y, z);
+      m.receiveShadow = true;
+      escena.add(m);
+      return m;
+    };
+    const asfalto = oscuro.matches ? "#232a27" : "#454c4a";
+    for (const z of CALLES_Z) plano(31.8, 1.8, 0, z, 0.012, asfalto);
+    for (const x of CALLES_X) plano(1.8, 18.6, x, -1.5, 0.012, asfalto);
+    for (const z of CALLES_Z)
+      for (let x = -15; x <= 15; x += 2.2) {
+        if (CALLES_X.some((cx) => Math.abs(x - cx) < 1.3)) continue;
+        plano(1.0, 0.07, x, z, 0.02, "#e9e3c8");
+      }
+    for (const x of CALLES_X)
+      for (let z = -10.4; z <= 7.4; z += 2.2) {
+        if (CALLES_Z.some((cz) => Math.abs(z - cz) < 1.3)) continue;
+        plano(0.07, 1.0, x, z, 0.02, "#e9e3c8");
+      }
+    for (const m of MANZANAS) {
+      const acera = new THREE.Mesh(new THREE.BoxGeometry(m.w, 0.05, m.d), material("#cfd0c5"));
+      acera.position.set(m.x, 0.025, m.z);
+      acera.receiveShadow = true;
+      escena.add(acera);
+      plano(m.w - 0.6, m.d - 0.6, m.x, m.z, ALTURA_MANZANA, oscuro.matches ? "#2b6e3e" : "#58ab62");
     }
-    for (const [x, z, r, a] of [[-30, -38, 11, 3.2], [-10, -42, 14, 3.8], [14, -40, 12, 3.4], [34, -37, 11, 3]] as const) {
+    // Aparcamiento en la manzana trasera central
+    const parking = aparcamiento();
+    parking.position.set(-1, ALTURA_MANZANA, -5.6);
+    escena.add(parking);
+
+    // Árboles repartidos en las manzanas, esquivando edificios y aparcamiento
+    const hueco = (x: number, z: number) =>
+      Object.values(SITIO).some((s) => Math.abs(x - s.x) < s.ancho / 2 + 1.5 && Math.abs(z - s.z) < s.fondo / 2 + 1.4) ||
+      (Math.abs(x + 1) < 4.2 && Math.abs(z + 5.6) < 3);
+    const al = azar(42);
+    const puntos: [number, number, number][] = [];
+    for (const m of MANZANAS)
+      for (let i = 0; i < 40 && puntos.length < 60; i++) {
+        const x = m.x + (al() - 0.5) * (m.w - 1.2);
+        const z = m.z + (al() - 0.5) * (m.d - 1.2);
+        if (!hueco(x, z) && (i % 3 === 0 || Math.abs(Math.abs(x - m.x) - (m.w - 1.2) / 2) < 0.8 || Math.abs(Math.abs(z - m.z) - (m.d - 1.2) / 2) < 0.8)) puntos.push([x, z, 0.45 + al() * 0.35]);
+      }
+    for (let i = 0; i < 26; i++) {
+      const x = (al() - 0.5) * 44;
+      const z = al() < 0.5 ? -12 - al() * 8 : 9.5 + al() * 7;
+      puntos.push([x, z, 0.6 + al() * 0.6]);
+    }
+    const troncos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.08, 0.5, 6), material("#6b4e1c"), puntos.length);
+    const copas = new THREE.InstancedMesh(new THREE.ConeGeometry(0.42, 1.1, 7), material("#ffffff"), puntos.length);
+    const mat4 = new THREE.Matrix4();
+    const col = new THREE.Color();
+    puntos.forEach(([x, z, e], i) => {
+      mat4.compose(new THREE.Vector3(x, ALTURA_MANZANA + 0.25 * e, z), new THREE.Quaternion(), new THREE.Vector3(e, e, e));
+      troncos.setMatrixAt(i, mat4);
+      mat4.compose(new THREE.Vector3(x, ALTURA_MANZANA + 1.0 * e, z), new THREE.Quaternion(), new THREE.Vector3(e, e, e));
+      copas.setMatrixAt(i, mat4);
+      copas.setColorAt(i, col.set(oscuro.matches ? "#1d5a33" : "#2f7d3a").offsetHSL((al() - 0.5) * 0.04, 0, (al() - 0.5) * 0.1));
+    });
+    troncos.castShadow = copas.castShadow = true;
+    escena.add(troncos, copas);
+
+    // Farolas a lo largo de las calles
+    for (const z of CALLES_Z)
+      for (let x = -13; x <= 13; x += 6.5) {
+        const f = new THREE.Group();
+        caja(f, 0.05, 0.9, 0.05, "#59636a", 0, 0, 0);
+        caja(f, 0.22, 0.06, 0.1, "#2b3438", 0.08, 0.9, 0, { emissive: new THREE.Color("#fff3b0"), emissiveIntensity: 0.5 });
+        f.position.set(x, 0.02, z + (z > 0 ? -1.0 : 1.0));
+        escena.add(f);
+      }
+
+    // Coches: unos pocos recorren las calles horizontales
+    const coches: { m: THREE.Mesh; z: number; v: number; o: number }[] = [];
+    const movimientoReducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const colCoche = ["#c0392b", "#2e6da4", "#e0a82e", "#f4f1e8", "#6b8e5a"];
+    for (let i = 0; i < 7; i++) {
+      const c = new THREE.Group();
+      caja(c, 0.8, 0.22, 0.4, colCoche[i % colCoche.length], 0, 0, 0);
+      caja(c, 0.4, 0.16, 0.34, "#34495a", -0.05, 0.22, 0);
+      const z = CALLES_Z[i % 3] + (i % 2 ? 0.4 : -0.4);
+      c.position.set(0, 0.03, z);
+      escena.add(c);
+      coches.push({ m: c as unknown as THREE.Mesh, z, v: (i % 2 ? -1 : 1) * (0.9 + (i % 3) * 0.3), o: i * 9.3 });
+    }
+
+    const hills: [number, number, number, number][] = [[-34, -44, 11, 3.2], [-12, -48, 14, 3.8], [14, -46, 12, 3.4], [36, -43, 11, 3]];
+    for (const [x, z, r, a] of hills) {
       const c = new THREE.Mesh(new THREE.ConeGeometry(r, a, 7), material(oscuro.matches ? "#1d3a2a" : "#8fb698"));
       c.position.set(x, a / 2 - 0.5, z);
       escena.add(c);
@@ -365,17 +478,17 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
     const resalte = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: "#f4f1e8", dashSize: 0.25, gapSize: 0.18 }));
     escena.add(resalte);
 
-    const camara = new THREE.PerspectiveCamera(36, 2, 0.1, 150);
+    const camara = new THREE.PerspectiveCamera(34, 2, 0.1, 150);
     const controles = new OrbitControls(camara, renderer.domElement);
-    controles.target.set(0.2, 1.1, 0);
+    controles.target.set(-0.5, 0, -0.5);
     controles.enableDamping = true;
     controles.enablePan = false;
-    controles.minAzimuthAngle = -0.75;
-    controles.maxAzimuthAngle = 0.75;
-    controles.minPolarAngle = 0.55;
-    controles.maxPolarAngle = 1.25;
-    controles.minDistance = 9;
-    controles.maxDistance = 38;
+    controles.minAzimuthAngle = -1.0;
+    controles.maxAzimuthAngle = 1.0;
+    controles.minPolarAngle = 0.35;
+    controles.maxPolarAngle = 1.2;
+    controles.minDistance = 10;
+    controles.maxDistance = 48;
     controles.zoomSpeed = 0.7;
 
     let distanciaBase = 22;
@@ -386,12 +499,12 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
       renderer.setSize(w, h, false);
       camara.aspect = w / h;
       camara.updateProjectionMatrix();
-      const necesaria = 12.4 / (Math.tan(THREE.MathUtils.degToRad(camara.fov / 2)) * camara.aspect);
-      distanciaBase = Math.min(controles.maxDistance, Math.max(14, necesaria));
+      const necesaria = 16.5 / (Math.tan(THREE.MathUtils.degToRad(camara.fov / 2)) * camara.aspect);
+      distanciaBase = Math.min(controles.maxDistance, Math.max(22, necesaria));
       const dir = new THREE.Vector3().subVectors(camara.position, controles.target).normalize();
       camara.position.copy(controles.target).addScaledVector(dir, distanciaBase);
     };
-    camara.position.set(0, 7.5, 17);
+    camara.position.set(0, 20, 20);
     ajustar();
     const observador = new ResizeObserver(ajustar);
     observador.observe(cont);
@@ -425,7 +538,7 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
         const pick = new THREE.Mesh(new THREE.BoxGeometry(sitio.ancho, 3, sitio.fondo), new THREE.MeshBasicMaterial({ visible: false }));
         pick.position.y = 1.5;
         g.add(pick);
-        g.position.set(sitio.x, 0, sitio.z);
+        g.position.set(sitio.x, ALTURA_MANZANA, sitio.z);
         edificiosGrupo.add(g);
       }
     };
@@ -455,11 +568,17 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
       requestAnimationFrame(bucle);
       if (document.hidden) return;
       controles.update();
+      const ahora = performance.now() / 1000;
+      for (const c of coches) {
+        const x = movimientoReducido ? c.o - 14 : ((((ahora * c.v + c.o) % 31) + 31) % 31) - 15.5;
+        c.m.position.x = x;
+        c.m.rotation.y = c.v > 0 ? 0 : Math.PI;
+      }
       const el = elegidoRef.current;
       if (el !== anterior) {
         anterior = el;
         const s = SITIO[el];
-        const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => new THREE.Vector3(s.x + (a * (s.ancho + 0.7)) / 2, 0.06, s.z + (b * (s.fondo + 0.7)) / 2));
+        const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => new THREE.Vector3(s.x + (a * (s.ancho + 0.7)) / 2, 0.16, s.z + (b * (s.fondo + 0.7)) / 2));
         resalte.geometry.setFromPoints(pts);
         resalte.computeLineDistances();
       }
@@ -467,7 +586,7 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
         const b = etiquetas.current[t];
         if (!b) continue;
         const s = SITIO[t];
-        v.set(s.x, 0, s.z + s.fondo / 2 + 1.0).project(camara);
+        v.set(s.x, 0.3, s.z + s.fondo / 2 + 0.7).project(camara);
         b.style.transform = `translate(-50%, -50%) translate(${((v.x + 1) / 2) * cont.clientWidth}px, ${((1 - v.y) / 2) * cont.clientHeight}px)`;
       }
       renderer.render(escena, camara);
@@ -494,7 +613,7 @@ export function Escena3D({ edificios, elegido, onElegir, onFallo, principal, sec
   }, [firma]);
 
   return (
-    <div ref={contenedor} className="relative aspect-[4/3] w-full select-none sm:aspect-[2.3/1]" data-escena3d>
+    <div ref={contenedor} className="relative aspect-[5/4] w-full select-none sm:aspect-[2/1]" data-escena3d>
       {TIPOS.map((t) => (
         <button
           key={t}
